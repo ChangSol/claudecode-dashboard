@@ -36,8 +36,11 @@ L1 is automatically clipped to terminal width (respects `$COLUMNS`) so L2 and L3
 
 ### 1. As a plugin
 
+Claude Code installs plugins via marketplaces, so it's a two-step flow — add the repo as a marketplace first, then install the `cc-dash` plugin from it:
+
 ```
-/plugin install https://github.com/ChangSol/claudecode-dashboard
+/plugin marketplace add ChangSol/claudecode-dashboard
+/plugin install cc-dash@claudecode-dashboard
 ```
 
 The `/ccd` slash command and the `cc-dash-config.sh` / `statusline.sh` scripts ship inside the plugin.

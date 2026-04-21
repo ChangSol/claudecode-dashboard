@@ -1,0 +1,12 @@
+{
+  "name": "claudecode-dashboard",
+  "owner": {
+    "name": "ChangSol"
+  },
+  "plugins": [
+    {
+      "name": "cc-dash",
+      "source": "."
+    }
+  ]
+}
