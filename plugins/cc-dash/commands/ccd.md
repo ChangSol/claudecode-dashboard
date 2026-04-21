@@ -1,7 +1,7 @@
 ---
 description: cc-dash 위젯 ON/OFF 토글
 argument-hint: [list|toggle|on|off|reset|all-on|all-off] [KEY ...]
-allowed-tools: Bash(bash ${CLAUDE_PLUGIN_ROOT}/scripts/cc-dash-config.sh*)
+allowed-tools: Bash(bash ${CLAUDE_PLUGIN_ROOT}/scripts/cc-dash-config.sh:*)
 ---
 
 !`bash ${CLAUDE_PLUGIN_ROOT}/scripts/cc-dash-config.sh $ARGUMENTS`
