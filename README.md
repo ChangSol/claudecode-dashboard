@@ -208,6 +208,16 @@ time (echo '{…}' | bash scripts/statusline.sh)
 CC_DASH_SHOW_SESSION=1 CC_DASH_SHOW_BUDGET=1 bash scripts/statusline.sh <<< '{…}'
 ```
 
+Expected output for the default render (no `widgets.conf` yet — clock and git widgets reflect your environment):
+
+```
+🧠 Opus 4.7 (1M context) │ ⏱  dur 2m0s │ 🪟 ctx 25% │ 💬 token 50.0K │ 💸 cost $0.50
+⏳ 5h 7% │ ⏳ 7d 26%
+🚀 cc v2.1.116 │ 🔀 git — │ 🕐 2026.04.21 14:53
+```
+
+Typical wall-clock on Git Bash for Windows is **100–140 ms** (dominated by bash startup and JSON parse; the budget widget is off by default so no JSONL scan). Native bash 5.2 on Linux/macOS is typically faster.
+
 ---
 
 ## License
