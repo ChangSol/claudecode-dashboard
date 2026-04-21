@@ -45,9 +45,15 @@ Claude Code installs plugins via marketplaces, so it's a two-step flow — add t
 
 The `/ccd` slash command and the `cc-dash-config.sh` / `statusline.sh` scripts ship inside the plugin.
 
-### 2. Wire up the statusLine (manual step)
+### 2. Wire up the statusLine
 
-Claude Code plugins cannot register a `statusLine` entry automatically. After installing the plugin, add this to your `~/.claude/settings.json`:
+```
+/ccd-setup
+```
+
+Claude Code's plugin manifest has no `statusLine` field, so the first-time wiring is a one-shot helper command that writes the correct `statusLine` entry into `~/.claude/settings.json` for you. Re-run it after every plugin upgrade — the installed path carries the version (`.../cc-dash/1.0.0/...`) and changes on each update.
+
+If you'd rather edit by hand, add this block to `~/.claude/settings.json` with the current installed path (see `/plugin` for the exact location):
 
 ```json
 {
@@ -58,7 +64,7 @@ Claude Code plugins cannot register a `statusLine` entry automatically. After in
 }
 ```
 
-Replace `<absolute-path-to>` with the plugin's checkout path (on Windows use forward slashes, e.g. `C:/Users/.../plugins/cc-dash/scripts/statusline.sh`).
+On Windows use forward slashes (e.g. `C:/Users/.../plugins/cache/claudecode-dashboard/cc-dash/1.0.0/scripts/statusline.sh`).
 
 ### 3. Without the plugin (vendored checkout)
 
@@ -192,10 +198,12 @@ claudecode-dashboard/         # repo root (= marketplace)
 │       ├── .claude-plugin/
 │       │   └── plugin.json   # plugin manifest
 │       ├── commands/
-│       │   └── ccd.md        # /ccd slash command (uses ${CLAUDE_PLUGIN_ROOT})
+│       │   ├── ccd.md            # /ccd slash command — widget toggle
+│       │   └── ccd-setup.md      # /ccd-setup — one-shot statusLine wire-up
 │       └── scripts/
 │           ├── statusline.sh     # the statusLine renderer
-│           └── cc-dash-config.sh # widget toggle CLI + interactive menu
+│           ├── cc-dash-config.sh # widget toggle CLI + interactive menu
+│           └── cc-dash-setup.sh  # settings.json patcher (called by /ccd-setup)
 ├── LICENSE
 └── README.md
 ```
