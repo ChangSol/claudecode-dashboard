@@ -1,6 +1,6 @@
 ---
 description: cc-dash statusLine을 settings.json에 자동 배선 (설치·업그레이드 직후 1회)
-allowed-tools: Bash(bash ${CLAUDE_PLUGIN_ROOT}/scripts/cc-dash-setup.sh*)
+allowed-tools: Bash(bash ${CLAUDE_PLUGIN_ROOT}/scripts/cc-dash-setup.sh:*)
 ---
 
 !`bash ${CLAUDE_PLUGIN_ROOT}/scripts/cc-dash-setup.sh`
