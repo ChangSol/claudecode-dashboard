@@ -1,7 +1,7 @@
 # cc-dash
 
 **A fork-free, zero-dependency statusLine for Claude Code.**
-13 widgets — model, duration, context, tokens, cost, rate limits, version, git, project, session, clock — rendered in three rows. Toggle any widget with `/ccd`.
+13 widgets — model, duration, context, tokens, cost, rate limits, version, git, project, session, clock — rendered in three rows. Toggle any widget with `/cc-dash:ccd`.
 
 ```
 🧠 Opus 4.7 (1M context) │ ⏱  dur 22m0s │ 🪟 ctx 25% │ 💬 token 50.0K │ 💸 cost $0.50
@@ -21,7 +21,7 @@ L1 is automatically clipped to terminal width (respects `$COLUMNS`) so L2 and L3
 
 ## Features
 
-- **13 widgets, all toggle-able** — `/ccd toggle BUDGET`, `/ccd off RATE_7D`, `/ccd reset`.
+- **13 widgets, all toggle-able** — `/cc-dash:ccd toggle BUDGET`, `/cc-dash:ccd off RATE_7D`, `/cc-dash:ccd reset`.
 - **3-row layout** — usage on row 1, rate limits on row 2, meta + clock on row 3.
 - **Self-labeling** — every icon has a short English tag so nothing is cryptic.
 - **Context %, 5h / 7d rate limits, token count, session cost** — all parsed from the statusLine JSON payload Claude Code provides.
@@ -43,12 +43,12 @@ Claude Code installs plugins via marketplaces, so it's a two-step flow — add t
 /plugin install cc-dash@claudecode-dashboard
 ```
 
-The `/ccd` slash command and the `cc-dash-config.sh` / `statusline.sh` scripts ship inside the plugin.
+The `/cc-dash:ccd` slash command and the `cc-dash-config.sh` / `statusline.sh` scripts ship inside the plugin.
 
 ### 2. Wire up the statusLine
 
 ```
-/ccd-setup
+/cc-dash:ccd-setup
 ```
 
 Claude Code's plugin manifest has no `statusLine` field, so the first-time wiring is a one-shot helper command that writes the correct `statusLine` entry into `~/.claude/settings.json` for you. Re-run it after every plugin upgrade — the installed path carries the version (`.../cc-dash/1.0.0/...`) and changes on each update.
@@ -76,17 +76,19 @@ Then point `statusLine.command` at `~/cc-dash/scripts/statusline.sh` and — if 
 
 ---
 
-## `/ccd` command
+## `/cc-dash:ccd` command
+
+Claude Code plugin slash commands require the `<plugin-name>:` namespace prefix, so every invocation is `/cc-dash:ccd …` (the short `/ccd` form isn't routed). If you want the shorter form, create a user-level alias at `~/.claude/commands/ccd.md` — see [the alias note](#shorter-command-aliases-optional) below.
 
 | Usage | What it does |
 |---|---|
-| `/ccd list` *(or `ls`, `status`)* | Show every widget with ON/off |
-| `/ccd toggle CLOCK GIT` | Toggle one or more widgets |
-| `/ccd on BUDGET` | Force on |
-| `/ccd off RATE_5H RATE_7D` | Force off |
-| `/ccd reset` | Back to defaults |
-| `/ccd all-on` / `/ccd all-off` | Bulk |
-| `/ccd help` | Usage |
+| `/cc-dash:ccd list` *(or `ls`, `status`)* | Show every widget with ON/off |
+| `/cc-dash:ccd toggle CLOCK GIT` | Toggle one or more widgets |
+| `/cc-dash:ccd on BUDGET` | Force on |
+| `/cc-dash:ccd off RATE_5H RATE_7D` | Force off |
+| `/cc-dash:ccd reset` | Back to defaults |
+| `/cc-dash:ccd all-on` / `/cc-dash:ccd all-off` | Bulk |
+| `/cc-dash:ccd help` | Usage |
 
 Widget keys (case-insensitive):
 
@@ -96,6 +98,33 @@ RATE_5H  RATE_7D  PERM  VERSION  GIT  PROJECT  SESSION
 ```
 
 State is persisted at `~/.config/cc-dash/widgets.conf` (override with `CC_DASH_CONFIG`). The file is plain `KEY=0/1` — editable by hand.
+
+### Shorter command aliases (optional)
+
+If typing `/cc-dash:ccd` every time is tedious, create user-level aliases in `~/.claude/commands/`:
+
+`~/.claude/commands/ccd.md`:
+
+```markdown
+---
+description: alias for /cc-dash:ccd
+argument-hint: "[list|toggle|on|off|reset|all-on|all-off] [KEY ...]"
+---
+
+/cc-dash:ccd $ARGUMENTS
+```
+
+`~/.claude/commands/ccd-setup.md`:
+
+```markdown
+---
+description: alias for /cc-dash:ccd-setup
+---
+
+/cc-dash:ccd-setup
+```
+
+After saving, `/ccd list` and `/ccd-setup` resolve to the plugin commands. User-level commands are personal, not shipped by the plugin, so anyone who wants the short form opts in once.
 
 ---
 
@@ -126,7 +155,7 @@ Context %, `5h`, `7d`, and budget % share the same threshold colors: green → a
 
 ### Budget widget (opt-in)
 
-`/ccd on BUDGET` enables a daily-spend tracker. It walks today's `~/.claude/projects/**/*.jsonl` and sums token usage × model rates. The result is cached for 60 seconds at `~/.cache/cc-dash-budget`.
+`/cc-dash:ccd on BUDGET` enables a daily-spend tracker. It walks today's `~/.claude/projects/**/*.jsonl` and sums token usage × model rates. The result is cached for 60 seconds at `~/.cache/cc-dash-budget`.
 
 > **Note:** The budget widget is designed for pay-per-token plans. If you use a Claude subscription plan, this widget will not reflect actual costs.
 
@@ -198,12 +227,12 @@ claudecode-dashboard/         # repo root (= marketplace)
 │       ├── .claude-plugin/
 │       │   └── plugin.json   # plugin manifest
 │       ├── commands/
-│       │   ├── ccd.md            # /ccd slash command — widget toggle
-│       │   └── ccd-setup.md      # /ccd-setup — one-shot statusLine wire-up
+│       │   ├── ccd.md            # /cc-dash:ccd slash command — widget toggle
+│       │   └── ccd-setup.md      # /cc-dash:ccd-setup — one-shot settings.json wire-up
 │       └── scripts/
 │           ├── statusline.sh     # the statusLine renderer
 │           ├── cc-dash-config.sh # widget toggle CLI + interactive menu
-│           └── cc-dash-setup.sh  # settings.json patcher (called by /ccd-setup)
+│           └── cc-dash-setup.sh  # settings.json patcher (called by /cc-dash:ccd-setup)
 ├── LICENSE
 └── README.md
 ```
