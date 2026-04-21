@@ -6,7 +6,7 @@
   "plugins": [
     {
       "name": "cc-dash",
-      "source": "."
+      "source": "./plugins/cc-dash"
     }
   ]
 }

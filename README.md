@@ -184,14 +184,19 @@ The old opt-in env vars still work and override config-file state:
 ## Project layout
 
 ```
-cc-dash/
+claudecode-dashboard/         # repo root (= marketplace)
 ├── .claude-plugin/
-│   └── plugin.json          # plugin manifest
-├── commands/
-│   └── ccd.md               # /ccd slash command (uses ${CLAUDE_PLUGIN_ROOT})
-├── scripts/
-│   ├── statusline.sh        # the statusLine renderer
-│   └── cc-dash-config.sh    # widget toggle CLI + interactive menu
+│   └── marketplace.json      # marketplace manifest (lists plugins)
+├── plugins/
+│   └── cc-dash/              # the cc-dash plugin
+│       ├── .claude-plugin/
+│       │   └── plugin.json   # plugin manifest
+│       ├── commands/
+│       │   └── ccd.md        # /ccd slash command (uses ${CLAUDE_PLUGIN_ROOT})
+│       └── scripts/
+│           ├── statusline.sh     # the statusLine renderer
+│           └── cc-dash-config.sh # widget toggle CLI + interactive menu
+├── LICENSE
 └── README.md
 ```
 
