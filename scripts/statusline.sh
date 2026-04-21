@@ -6,8 +6,8 @@
 # ---------- 0. 위젯 on/off 설정 로드 (fork-free) ----------
 # cc-dash-config.sh 로 편집. 환경변수 CC_DASH_SHOW_SESSION/BUDGET 은 역호환성 유지.
 CFG_CLOCK=1 CFG_MODEL=1 CFG_DURATION=1 CFG_CTX=1 CFG_TOKEN=1 CFG_COST=1
-CFG_BUDGET=1 CFG_RATE_5H=1 CFG_RATE_7D=1
-CFG_PERM=1 CFG_VERSION=1 CFG_GIT=1 CFG_PROJECT=0 CFG_SESSION=1
+CFG_BUDGET=0 CFG_RATE_5H=1 CFG_RATE_7D=1
+CFG_PERM=0 CFG_VERSION=1 CFG_GIT=1 CFG_PROJECT=0 CFG_SESSION=0
 _CC_DASH_CFG="${CC_DASH_CONFIG:-$HOME/.config/cc-dash/widgets.conf}"
 if [[ -f "$_CC_DASH_CFG" ]]; then
   while IFS='=' read -r _k _v; do
