@@ -1,7 +1,8 @@
 #!/bin/bash
-# cc-dash one-time wire-up — sets ~/.claude/settings.json statusLine.command
-# to the currently installed plugin's statusline.sh. Idempotent; re-run after
-# plugin upgrades to pick up the new versioned install path.
+# cc-dash one-time wire-up for ~/.claude/settings.json:
+#   - statusLine.command → this install's statusline.sh
+#   - permissions.allow  → Bash allowlist for /ccd and /ccd-setup invocations
+# Idempotent; safe to re-run after each plugin upgrade to refresh the path.
 #
 # Override for testing: CC_DASH_SETTINGS=/tmp/x.json bash cc-dash-setup.sh
 
@@ -42,10 +43,25 @@ catch (e) { console.error('error reading ' + path + ': ' + e.message); process.e
 let cfg;
 try { cfg = raw.trim() ? JSON.parse(raw) : {}; }
 catch (e) { console.error('error: ' + path + ' is not valid JSON — aborting to avoid data loss. (' + e.message + ')'); process.exit(1); }
+
+// 1. statusLine
 const cmd = "bash '" + sl + "'";
 const prev = cfg.statusLine && cfg.statusLine.command;
 cfg.statusLine = { type: 'command', command: cmd };
+
+// 2. permissions.allow — Bash rules so /ccd and /ccd-setup skip approval prompts
+cfg.permissions = cfg.permissions || {};
+cfg.permissions.allow = cfg.permissions.allow || [];
+const rules = [
+  'Bash(*cc-dash-config.sh*)',
+  'Bash(*cc-dash-setup.sh*)',
+  'Bash(*statusline.sh*)'
+];
+const addedRules = rules.filter(r => !cfg.permissions.allow.includes(r));
+cfg.permissions.allow.push(...addedRules);
+
 fs.writeFileSync(path, JSON.stringify(cfg, null, 2) + '\n');
+
 if (prev === cmd) {
   console.log('statusLine already up to date: ' + cmd);
 } else if (prev) {
@@ -54,6 +70,11 @@ if (prev === cmd) {
   console.log('  to:   ' + cmd);
 } else {
   console.log('statusLine added: ' + cmd);
+}
+if (addedRules.length) {
+  console.log('permissions.allow added: ' + addedRules.join(', '));
+} else {
+  console.log('permissions.allow already has cc-dash rules.');
 }
 JS
 
