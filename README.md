@@ -5,7 +5,7 @@
 
 ```
 🧠 Opus 4.7 (1M context) │ ⏱  dur 22m0s │ 🪟 ctx 25% │ 💬 token 50.0K │ 💸 cost $0.50
-⏳ 5h 0% reset 3h0m │ ⏳ 7d 2% reset 6d22h
+⏳ now 0% reset 3h0m │ ⏳ week 2% reset 6d22h
 🚀 cc v2.1.116 │ 🔀 git: main │ 🕐 2026.04.21 13:03
 ```
 
@@ -24,7 +24,7 @@ L1 is automatically clipped to terminal width (respects `$COLUMNS`) so L2 and L3
 - **13 widgets, all toggle-able** — `/cc-dash:ccd toggle BUDGET`, `/cc-dash:ccd off RATE_7D`, `/cc-dash:ccd reset`.
 - **3-row layout** — usage on row 1, rate limits on row 2, meta + clock on row 3.
 - **Self-labeling** — every icon has a short English tag so nothing is cryptic.
-- **Context %, 5h / 7d rate limits, token count, session cost** — all parsed from the statusLine JSON payload Claude Code provides.
+- **Context %, now (5h) / week (7d) rate limits, token count, session cost** — all parsed from the statusLine JSON payload Claude Code provides.
 - **Threshold colors** — ≥50% amber, ≥80% red. `⏳` flips to `⌛` when quota is hot.
 - **Git branch** + in-progress indicator (`*` for merge/rebase).
 - **Optional budget widget** — scans today's JSONL logs to track daily spend against `$CC_DASH_BUDGET`.
@@ -138,8 +138,8 @@ After saving, `/ccd list` and `/ccd-setup` resolve to the plugin commands. User-
 | `TOKEN`    | on  | `💬 token 58.3K`                | 1 |
 | `COST`     | on  | `💸 cost $1.66`                 | 1 |
 | `BUDGET`   | **off** | `💰 budget $4.21/$15 (28%)`| 1 |
-| `RATE_5H`  | on  | `⏳ 5h 19% reset 3h8m`          | 2 |
-| `RATE_7D`  | on  | `⏳ 7d 2% reset 6d22h`          | 2 |
+| `RATE_5H`  | on  | `⏳ now 19% reset 3h8m`         | 2 |
+| `RATE_7D`  | on  | `⏳ week 2% reset 6d22h`        | 2 |
 | `PERM`     | **off** | `🔒 perm ask`               | 3 |
 | `VERSION`  | on  | `🚀 cc v2.1.116`                | 3 |
 | `GIT`      | on  | `🔀 git: main` / `🔀 git: main*`| 3 |
@@ -147,7 +147,7 @@ After saving, `/ccd list` and `/ccd-setup` resolve to the plugin commands. User-
 | `SESSION`  | **off** | `🆔 ab12cd34`               | 3 |
 | `CLOCK`    | on  | `🕐 2026.04.21 13:03`           | 3 (rightmost) |
 
-Context %, `5h`, `7d`, and budget % share the same threshold colors: green → amber (≥50%) → red (≥80%).
+Context %, `now` (5h), `week` (7d), and budget % share the same threshold colors: green → amber (≥50%) → red (≥80%).
 
 ---
 
@@ -257,7 +257,7 @@ Expected output for the default render (no `widgets.conf` yet — clock and git 
 
 ```
 🧠 Opus 4.7 (1M context) │ ⏱  dur 2m0s │ 🪟 ctx 25% │ 💬 token 50.0K │ 💸 cost $0.50
-⏳ 5h 7% │ ⏳ 7d 26%
+⏳ now 7% │ ⏳ week 26%
 🚀 cc v2.1.116 │ 🔀 git — │ 🕐 2026.04.21 14:53
 ```
 

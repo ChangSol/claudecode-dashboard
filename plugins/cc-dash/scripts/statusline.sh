@@ -288,8 +288,8 @@ append() {
 [[ "$CFG_COST"     == "1" ]] && append L1 "💸 cost ${COST_DISPLAY}"
 [[ -n "$BUDGET_DISPLAY"    ]] && append L1 "${BUDGET_DISPLAY}"
 
-[[ "$CFG_RATE_5H"  == "1" ]] && append L2 "${RATE_5H_ICON} 5h ${RATE_5H_COLOR}${RATE_5H}%${RST}${TIMER_5H}"
-[[ "$CFG_RATE_7D"  == "1" ]] && append L2 "${RATE_7D_ICON} 7d ${RATE_7D_COLOR}${RATE_7D}%${RST}${TIMER_7D}"
+[[ "$CFG_RATE_5H"  == "1" ]] && append L2 "${RATE_5H_ICON} now ${RATE_5H_COLOR}${RATE_5H}%${RST}${TIMER_5H}"
+[[ "$CFG_RATE_7D"  == "1" ]] && append L2 "${RATE_7D_ICON} week ${RATE_7D_COLOR}${RATE_7D}%${RST}${TIMER_7D}"
 
 [[ "$CFG_PERM"    == "1" ]] && append L3 "$PERM_DISPLAY"
 [[ "$CFG_VERSION" == "1" ]] && append L3 "$VERSION_DISPLAY"
