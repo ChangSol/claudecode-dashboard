@@ -18,7 +18,7 @@ fi
 CFG_CLOCK=1 CFG_MODEL=1 CFG_DURATION=1 CFG_CTX=1 CFG_TOKEN=1 CFG_COST=1
 CFG_BUDGET=0 CFG_RATE_5H=1 CFG_RATE_7D=1
 CFG_PERM=0 CFG_VERSION=1 CFG_GIT=1 CFG_PROJECT=0 CFG_SESSION=0
-CFG_LINES=1 CFG_API_DUR=0 CFG_STYLE=0
+CFG_LINES=1 CFG_API_DUR=0 CFG_STYLE=0 CFG_RATE_MODEL=1
 _CC_DASH_CFG="${CC_DASH_CONFIG:-$HOME/.config/cc-dash/widgets.conf}"
 if [[ -f "$_CC_DASH_CFG" ]]; then
   while IFS='=' read -r _k _v; do
@@ -46,6 +46,8 @@ MODEL="—" MODEL_ID="" CTX_SIZE=0 DURATION_MS=0 CTX_PCT=0 TOKENS=0 COST=""
 RATE_5H=0 RATE_5H_RESET=0 RATE_7D=0 RATE_7D_RESET=0
 CWD="" SESSION_ID="" PERM_MODE="" CC_VERSION=""
 LINES_ADD=0 LINES_DEL=0 API_DUR_MS=0 STYLE_NAME=""
+# 모델별/용도별 주간 윈도 (seven_day_opus·seven_day_sonnet 등 — 제네릭 수집)
+RATE_MD_KEYS=() RATE_MD_PCTS=() RATE_MD_RESETS=()
 
 in_block="" block_filled=0
 while IFS= read -r line; do
@@ -57,6 +59,11 @@ while IFS= read -r line; do
   case "$key" in
     five_hour)  in_block="5h"; block_filled=0;;
     seven_day)  in_block="7d"; block_filled=0;;
+    seven_day_*) # 모델별 주간 윈도 객체(seven_day_opus 등). 불리언(seven_day_overage_included)은 val 이 차 있어 제외
+      if [[ -z "$val" ]]; then
+        in_block="md"; block_filled=0
+        RATE_MD_KEYS+=("${key#seven_day_}"); RATE_MD_PCTS+=(0); RATE_MD_RESETS+=(0)
+      fi;;
     output_style) # 객체형({"name":...})이면 다음 name 키 대기, 문자열형이면 즉시 값
       if [[ -n "$val" ]]; then STYLE_NAME="$val"; else in_block="style"; fi;;
     name)         [[ "$in_block" == "style" ]] && { STYLE_NAME="$val"; in_block=""; };;
@@ -78,6 +85,7 @@ while IFS= read -r line; do
       case "$in_block" in
         5h) RATE_5H_RESET="$val"; block_filled=$((block_filled+1));;
         7d) RATE_7D_RESET="$val"; block_filled=$((block_filled+1));;
+        md) RATE_MD_RESETS[${#RATE_MD_KEYS[@]}-1]="$val"; block_filled=$((block_filled+1));;
       esac
       [ "$block_filled" -ge 2 ] && { in_block=""; block_filled=0; };;
     used_percentage)
@@ -85,6 +93,7 @@ while IFS= read -r line; do
       case "$in_block" in
         5h) RATE_5H="$val"; block_filled=$((block_filled+1));;
         7d) RATE_7D="$val"; block_filled=$((block_filled+1));;
+        md) RATE_MD_PCTS[${#RATE_MD_KEYS[@]}-1]="$val"; block_filled=$((block_filled+1));;
         *)  CTX_PCT="$val";;
       esac
       [ "$block_filled" -ge 2 ] && { in_block=""; block_filled=0; };;
@@ -351,7 +360,7 @@ fi
 # ---------- 6. 출력 조립 ----------
 # 3행으로 분배.
 #   L1 사용량:  model · duration · api(opt) · ctx · token · cost · lines · budget(opt)
-#   L2 리밋:    now(5h) · week(7d)
+#   L2 리밋:    now(5h) · week(7d) · 모델별 주간(opt, 페이로드 있을 때만)
 #   L3 메타:    perm(opt) · style(opt) · version · git · project · session · clock (맨 오른쪽)
 # 위젯 CFG_* 가 0 이면 세그먼트가 빠지고 구분자(│)도 남지 않는다.
 L1="" L2="" L3=""
@@ -371,6 +380,26 @@ append() {
 
 [[ "$CFG_RATE_5H"  == "1" ]] && append L2 "${RATE_5H_ICON} now ${RATE_5H_COLOR}${RATE_5H}%${RST}${PACE_5H}${TIMER_5H}"
 [[ "$CFG_RATE_7D"  == "1" ]] && append L2 "${RATE_7D_ICON} week ${RATE_7D_COLOR}${RATE_7D}%${RST}${PACE_7D}${TIMER_7D}"
+# 모델별 주간 윈도 — 페이로드에 seven_day_* 블록이 있을 때만 노출 (제네릭 라벨)
+if [[ "$CFG_RATE_MODEL" == "1" ]]; then
+  for _i in "${!RATE_MD_KEYS[@]}"; do
+    _mp="${RATE_MD_PCTS[_i]}"; _mr="${RATE_MD_RESETS[_i]}"
+    [[ -z "$_mp" || "$_mp" == "null" ]] && _mp=0
+    case "${RATE_MD_KEYS[_i]}" in
+      opus)   _ml="Opus";;
+      sonnet) _ml="Sonnet";;
+      fable)  _ml="Fable";;
+      haiku)  _ml="Haiku";;
+      oauth_apps) _ml="apps";;
+      *)      _ml="${RATE_MD_KEYS[_i]}";;
+    esac
+    color_for "$_mp"; _mc="$COLOR"
+    if [ "$_mp" -ge 80 ]; then _mi="⌛"; else _mi="⏳"; fi
+    fmt_remain "$_mr"; _mt="$REMAIN_FMT"; [ -n "$_mt" ] && _mt=" reset ${_mt}"
+    pace_flag "$_mp" "$_mr" 604800
+    append L2 "${_mi} ${_ml} ${_mc}${_mp}%${RST}${REPLY_PACE}${_mt}"
+  done
+fi
 
 [[ "$CFG_PERM"    == "1" ]] && append L3 "$PERM_DISPLAY"
 [[ "$CFG_STYLE"   == "1" ]] && append L3 "🎨 style ${STYLE_NAME:-—}"
@@ -401,6 +430,8 @@ _clip_line() {
   printf '%s' "$out"
 }
 (( ${#L1} + 5 > _cols )) && L1=$(_clip_line "$L1" "$(( _cols - 1 ))")
+# L2도 모델별 윈도(RATE_MODEL)로 비유계가 될 수 있어 동일 클립 적용
+(( ${#L2} + 5 > _cols )) && L2=$(_clip_line "$L2" "$(( _cols - 1 ))")
 
 emit() {
   [[ -n "$1" ]] || return

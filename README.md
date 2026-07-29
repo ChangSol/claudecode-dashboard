@@ -1,7 +1,7 @@
 # cc-dash
 
 **A fork-free, zero-dependency statusLine for Claude Code.**
-16 widgets — model, duration, API duration, context, tokens, cost, lines changed, budget, rate limits, permission, output style, version, git, project, session, clock — rendered in three rows. Toggle any widget with `/cc-dash:ccd`.
+17 widgets — model, duration, API duration, context, tokens, cost, lines changed, budget, rate limits (incl. per-model weekly), permission, output style, version, git, project, session, clock — rendered in three rows. Toggle any widget with `/cc-dash:ccd`.
 
 ```
 🧠 Opus 4.7 (1M context) │ ⏱  dur 22m0s │ 🪟 ctx 25% │ 💬 token 50.0K │ 💸 cost $0.50 │ ✏️  +120/-34
@@ -21,7 +21,7 @@ L1 is automatically clipped to terminal width (respects `$COLUMNS`) so L2 and L3
 
 ## Features
 
-- **16 widgets, all toggle-able** — `/cc-dash:ccd toggle BUDGET`, `/cc-dash:ccd off RATE_7D`, `/cc-dash:ccd reset`.
+- **17 widgets, all toggle-able** — `/cc-dash:ccd toggle BUDGET`, `/cc-dash:ccd off RATE_7D`, `/cc-dash:ccd reset`.
 - **3-row layout** — usage on row 1, rate limits on row 2, meta + clock on row 3.
 - **Self-labeling** — every icon has a short English tag so nothing is cryptic.
 - **Context %, now (5h) / week (7d) rate limits, token count, session cost** — all parsed from the statusLine JSON payload Claude Code provides.
@@ -96,7 +96,7 @@ Widget keys (case-insensitive):
 
 ```
 CLOCK  MODEL  DURATION  API_DUR  CTX  TOKEN  COST  LINES  BUDGET
-RATE_5H  RATE_7D  PERM  STYLE  VERSION  GIT  PROJECT  SESSION
+RATE_5H  RATE_7D  RATE_MODEL  PERM  STYLE  VERSION  GIT  PROJECT  SESSION
 ```
 
 State is persisted at `~/.config/cc-dash/widgets.conf` (override with `CC_DASH_CONFIG`). The file is plain `KEY=0/1` — editable by hand.
@@ -144,6 +144,7 @@ After saving, `/ccd list` and `/ccd-setup` resolve to the plugin commands. User-
 | `BUDGET`   | **off** | `💰 budget $4.21/$15 (28%)`| 1 |
 | `RATE_5H`  | on  | `⏳ now 19% reset 3h8m`         | 2 |
 | `RATE_7D`  | on  | `⏳ week 2% reset 6d22h`        | 2 |
+| `RATE_MODEL` | on | `⏳ Opus 22% reset 4d2h`      | 2 |
 | `PERM`     | **off** | `🔒 perm ask`               | 3 |
 | `STYLE`    | **off** | `🎨 style Explanatory`      | 3 |
 | `VERSION`  | on  | `🚀 cc v2.1.116`                | 3 |
@@ -158,6 +159,7 @@ Usage extras (no separate toggles — they ride their parent widget):
 - `CTX` appends `(used/total)` when the payload carries `context_window_size`.
 - `COST` appends an hourly burn-rate estimate (`~$X.X/h`) once the session is 5+ minutes old.
 - `RATE_5H` / `RATE_7D` append 🔥 when your usage % is ≥15 points ahead of the window's elapsed time — you are on pace to exhaust the limit before it resets.
+- `RATE_MODEL` renders one segment per model-scoped weekly window in the payload (`seven_day_opus`, `seven_day_sonnet`, …) with the same colors/timer/🔥 treatment, labeled by model (`Opus 22%`). Hidden automatically when the payload carries none — Claude Code only sends these on plans with per-model weekly limits.
 
 ---
 

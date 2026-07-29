@@ -25,6 +25,7 @@ WIDGETS=(
   "BUDGET:💰 일일 예산 % (opt-in, JSONL 스캔)"
   "RATE_5H:⏳ now(5h) 리밋 + 타이머 (🔥 페이스 경고)"
   "RATE_7D:⏳ week(7d) 리밋 + 타이머 (🔥 페이스 경고)"
+  "RATE_MODEL:⏳ 모델별 주간 리밋 (Opus 등 — 페이로드 제공 시)"
   "PERM:🔒 권한 모드"
   "STYLE:🎨 output style (opt-in)"
   "VERSION:🚀 Claude Code 버전"
@@ -33,7 +34,7 @@ WIDGETS=(
   "SESSION:🆔 세션 ID"
 )
 
-DEFAULT_KEYS=(CLOCK MODEL DURATION CTX TOKEN COST LINES RATE_5H RATE_7D VERSION GIT)
+DEFAULT_KEYS=(CLOCK MODEL DURATION CTX TOKEN COST LINES RATE_5H RATE_7D RATE_MODEL VERSION GIT)
 DEFAULT_OFF=(BUDGET PERM PROJECT SESSION API_DUR STYLE)
 
 declare -A STATE
@@ -125,7 +126,7 @@ cc-dash 위젯 ON/OFF
   cc-dash-config.sh all-on | all-off   전체 ON/OFF
 
 KEY (대소문자 무관): CLOCK MODEL DURATION API_DUR CTX TOKEN COST LINES BUDGET
-                    RATE_5H RATE_7D PERM STYLE VERSION GIT PROJECT SESSION
+                    RATE_5H RATE_7D RATE_MODEL PERM STYLE VERSION GIT PROJECT SESSION
 EOF
       exit 0;;
     *) printf '알 수 없는 명령: %s ("help" 참고)\n' "$cmd" >&2; exit 2;;
