@@ -3,7 +3,7 @@
 [한국어](README.md) | **English**
 
 **A fork-free, zero-dependency statusLine for Claude Code.**
-17 widgets — model, duration, API duration, context, tokens, cost, lines changed, budget, rate limits (incl. per-model weekly), permission, output style, version, git, project, session, clock — rendered in three rows. Toggle any widget with `/cc-dash:ccd`.
+18 widgets — model, duration, API duration, context, tokens, cost, lines changed, budget, rate limits (incl. per-model weekly), permission, output style, version, git, project, session, clock — rendered in three rows. Toggle any widget with `/cc-dash:ccd`.
 
 ```
 🧠 Opus 4.7 (1M context) │ ⏱  dur 22m0s │ 🪟 ctx 25% │ 💬 token 50.0K │ 💸 cost $0.50 │ ✏️  +120/-34
@@ -23,7 +23,7 @@ L1 is automatically clipped to terminal width (respects `$COLUMNS`) so L2 and L3
 
 ## Features
 
-- **17 widgets, all toggle-able** — `/cc-dash:ccd toggle BUDGET`, `/cc-dash:ccd off RATE_7D`, `/cc-dash:ccd reset`.
+- **18 widgets, all toggle-able** — `/cc-dash:ccd toggle BUDGET`, `/cc-dash:ccd off RATE_7D`, `/cc-dash:ccd reset`.
 - **3-row layout** — usage on row 1, rate limits on row 2, meta + clock on row 3.
 - **Self-labeling** — every icon has a short English tag so nothing is cryptic.
 - **Context %, now (5h) / week (7d) rate limits, token count, session cost** — all parsed from the statusLine JSON payload Claude Code provides.

@@ -3,7 +3,7 @@
 **한국어** | [English](README.en.md)
 
 **fork 없는 무의존성 Claude Code statusLine.**
-17개 위젯 — 모델, 경과 시간, API 시간, 컨텍스트, 토큰, 비용, 변경 라인, 예산, 리밋(모델별 주간 포함), 권한, output style, 버전, git, 프로젝트, 세션, 시각 — 을 3행으로 렌더링합니다. `/cc-dash:ccd`로 위젯별 ON/OFF.
+18개 위젯 — 모델, 경과 시간, API 시간, 컨텍스트, 토큰, 비용, 변경 라인, 예산, 리밋(모델별 주간 포함), 권한, output style, 버전, git, 프로젝트, 세션, 시각 — 을 3행으로 렌더링합니다. `/cc-dash:ccd`로 위젯별 ON/OFF.
 
 ```
 🧠 Opus 4.7 (1M context) │ ⏱  dur 22m0s │ 🪟 ctx 25% │ 💬 token 50.0K │ 💸 cost $0.50 │ ✏️  +120/-34
@@ -23,7 +23,7 @@
 
 ## 주요 기능
 
-- **17개 위젯 전부 토글 가능** — `/cc-dash:ccd toggle BUDGET`, `/cc-dash:ccd off RATE_7D`, `/cc-dash:ccd reset`.
+- **18개 위젯 전부 토글 가능** — `/cc-dash:ccd toggle BUDGET`, `/cc-dash:ccd off RATE_7D`, `/cc-dash:ccd reset`.
 - **3행 레이아웃** — 1행 사용량, 2행 리밋, 3행 메타 + 시계.
 - **셀프 라벨링** — 모든 아이콘에 짧은 영문 태그가 붙어 있어 의미가 헷갈리지 않습니다.
 - **컨텍스트 %, now(5h)/week(7d) 리밋, 토큰 수, 세션 비용** — 전부 Claude Code가 제공하는 statusLine JSON 페이로드에서 파싱합니다.
