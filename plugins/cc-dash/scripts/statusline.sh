@@ -18,6 +18,7 @@ fi
 CFG_CLOCK=1 CFG_MODEL=1 CFG_DURATION=1 CFG_CTX=1 CFG_TOKEN=1 CFG_COST=1
 CFG_BUDGET=0 CFG_RATE_5H=1 CFG_RATE_7D=1
 CFG_PERM=0 CFG_VERSION=1 CFG_GIT=1 CFG_PROJECT=0 CFG_SESSION=0
+CFG_LINES=1 CFG_API_DUR=0 CFG_STYLE=0
 _CC_DASH_CFG="${CC_DASH_CONFIG:-$HOME/.config/cc-dash/widgets.conf}"
 if [[ -f "$_CC_DASH_CFG" ]]; then
   while IFS='=' read -r _k _v; do
@@ -30,8 +31,10 @@ fi
 [[ "$CC_DASH_SHOW_BUDGET"  == "1" ]] && CFG_BUDGET=1
 
 # ---------- 1. stdin → 변수 ----------
+# `|| [[ -n ... ]]`: 개행 없이 끝나는 마지막 라인도 수거 — 없으면 페이로드가
+# 단일 라인 + 무개행일 때 input이 통째로 비어 전 위젯이 기본값으로 무력화된다.
 input=""
-while IFS= read -r _line; do input+="$_line"; done
+while IFS= read -r _line || [[ -n "$_line" ]]; do input+="$_line"; done
 
 # 한 줄 JSON 대응: 구분자 치환으로 라인 단위 파싱화
 input="${input//,/$'\n'}"
@@ -42,6 +45,7 @@ input="${input//\}/$'\n'}"
 MODEL="—" MODEL_ID="" CTX_SIZE=0 DURATION_MS=0 CTX_PCT=0 TOKENS=0 COST=""
 RATE_5H=0 RATE_5H_RESET=0 RATE_7D=0 RATE_7D_RESET=0
 CWD="" SESSION_ID="" PERM_MODE="" CC_VERSION=""
+LINES_ADD=0 LINES_DEL=0 API_DUR_MS=0 STYLE_NAME=""
 
 in_block="" block_filled=0
 while IFS= read -r line; do
@@ -53,6 +57,9 @@ while IFS= read -r line; do
   case "$key" in
     five_hour)  in_block="5h"; block_filled=0;;
     seven_day)  in_block="7d"; block_filled=0;;
+    output_style) # 객체형({"name":...})이면 다음 name 키 대기, 문자열형이면 즉시 값
+      if [[ -n "$val" ]]; then STYLE_NAME="$val"; else in_block="style"; fi;;
+    name)         [[ "$in_block" == "style" ]] && { STYLE_NAME="$val"; in_block=""; };;
     display_name) MODEL="$val";;
     id)           MODEL_ID="$val";;
     current_dir)  CWD="$val";;
@@ -61,8 +68,11 @@ while IFS= read -r line; do
     version)      CC_VERSION="$val";;
     context_window_size) val="${val// /}"; CTX_SIZE="$val";;
     total_duration_ms)   val="${val// /}"; DURATION_MS="$val";;
+    total_api_duration_ms) val="${val// /}"; API_DUR_MS="$val";;
     total_input_tokens)  val="${val// /}"; TOKENS="$val";;
     total_cost_usd)      val="${val// /}"; COST="$val";;
+    total_lines_added)   val="${val// /}"; LINES_ADD="$val";;
+    total_lines_removed) val="${val// /}"; LINES_DEL="$val";;
     reset_timestamp|resets_at)
       val="${val// /}"; val="${val%.*}"
       case "$in_block" in
@@ -88,30 +98,59 @@ done <<< "$input"
 [[ -z "$TOKENS" || "$TOKENS" == "null" ]] && TOKENS=0
 [[ -z "$RATE_5H" || "$RATE_5H" == "null" ]] && RATE_5H=0
 [[ -z "$RATE_7D" || "$RATE_7D" == "null" ]] && RATE_7D=0
+[[ -z "$LINES_ADD" || "$LINES_ADD" == "null" ]] && LINES_ADD=0
+[[ -z "$LINES_DEL" || "$LINES_DEL" == "null" ]] && LINES_DEL=0
+[[ -z "$API_DUR_MS" || "$API_DUR_MS" == "null" ]] && API_DUR_MS=0
+[[ "$STYLE_NAME" == "null" ]] && STYLE_NAME=""
 
 # ---------- 4. 포매터 (순수 bash) ----------
 # Duration
-DURATION_S=$((DURATION_MS / 1000))
-MINS=$((DURATION_S / 60)); SECS=$((DURATION_S % 60))
-if [ "$MINS" -gt 0 ]; then TIME="${MINS}m${SECS}s"; else TIME="${SECS}s"; fi
+fmt_ms() { # $1=ms → REPLY_TIME="XmYs"|"Ys"
+  local _s=$(( $1 / 1000 )) _m
+  _m=$((_s / 60)); _s=$((_s % 60))
+  if [ "$_m" -gt 0 ]; then REPLY_TIME="${_m}m${_s}s"; else REPLY_TIME="${_s}s"; fi
+}
+fmt_ms "$DURATION_MS"; TIME="$REPLY_TIME"
+fmt_ms "$API_DUR_MS";  API_TIME="$REPLY_TIME"
 
-# Tokens → K/M
-if [ "$TOKENS" -gt 999999 ]; then
-  TOKEN_FMT="$((TOKENS/1000000)).$((TOKENS%1000000/100000))M"
-elif [ "$TOKENS" -gt 999 ]; then
-  TOKEN_FMT="$((TOKENS/1000)).$((TOKENS%1000/100))K"
-else
-  TOKEN_FMT="${TOKENS}"
+# 숫자 → K/M 축약
+fmt_km() { # $1=n → REPLY_KM
+  local _n="$1"
+  if [ "$_n" -gt 999999 ]; then
+    REPLY_KM="$((_n/1000000)).$((_n%1000000/100000))M"
+  elif [ "$_n" -gt 999 ]; then
+    REPLY_KM="$((_n/1000)).$((_n%1000/100))K"
+  else
+    REPLY_KM="$_n"
+  fi
+}
+fmt_km "$TOKENS"; TOKEN_FMT="$REPLY_KM"
+
+# ctx 절대량 — context_window_size 가 오면 % 뒤에 "used/total" 병기
+[[ -z "$CTX_SIZE" || "$CTX_SIZE" == "null" ]] && CTX_SIZE=0
+CTX_ABS=""
+if [ "$CTX_SIZE" -gt 0 ] 2>/dev/null; then
+  fmt_km $((CTX_SIZE * CTX_PCT / 100)); _ctx_used="$REPLY_KM"
+  fmt_km "$CTX_SIZE"
+  CTX_ABS=" (${_ctx_used}/${REPLY_KM})"
 fi
 
 # Cost → $X.XX
 if [[ -n "$COST" && "$COST" != "null" && "$COST" != "0" ]]; then
+  [[ "$COST" == *.* ]] || COST="${COST}.0"   # 정수 비용("5")이 $5.50 로 깨지던 것 방어
   COST_INT="${COST%%.*}"
   COST_DEC="${COST#*.}"
   COST_DEC="${COST_DEC:0:2}"
   [[ ${#COST_DEC} -eq 1 ]] && COST_DEC+="0"
   [[ ${#COST_DEC} -eq 0 ]] && COST_DEC="00"
   COST_DISPLAY="\$${COST_INT}.${COST_DEC}"
+  # 세션 5분 이상이면 시간당 소진율 추정 병기 (정수 센트 연산 — fork 없음)
+  DURATION_S=$((DURATION_MS / 1000))
+  if [ "$DURATION_S" -ge 300 ]; then
+    _cost_c=$((10#$COST_INT * 100 + 10#$COST_DEC))
+    _ph_c=$((_cost_c * 3600 / DURATION_S))
+    COST_DISPLAY+=" (~\$$((_ph_c/100)).$((_ph_c%100/10))/h)"
+  fi
 else
   COST_DISPLAY="\$0"
 fi
@@ -136,8 +175,23 @@ fmt_remain "$RATE_7D_RESET"; TIMER_7D="$REMAIN_FMT"
 [ -n "$TIMER_5H" ] && TIMER_5H=" reset ${TIMER_5H}"
 [ -n "$TIMER_7D" ] && TIMER_7D=" reset ${TIMER_7D}"
 
+# 소진 페이스 — 윈도 경과율보다 사용률이 15%p 이상 앞서면 🔥 (리셋 전 소진 위험)
+pace_flag() { # $1=used% $2=reset_epoch $3=window_sec → REPLY_PACE
+  local _used="$1" _reset="$2" _win="$3" _remain _elapsed
+  REPLY_PACE=""
+  [ "$_reset" -gt 0 ] 2>/dev/null && [ -n "$NOW_EPOCH" ] || return
+  _remain=$((_reset - NOW_EPOCH))
+  [ "$_remain" -gt 0 ] && [ "$_remain" -le "$_win" ] || return
+  _elapsed=$(( (_win - _remain) * 100 / _win ))
+  [ "$_used" -ge $((_elapsed + 15)) ] && REPLY_PACE="🔥"
+}
+pace_flag "$RATE_5H" "$RATE_5H_RESET" 18000;  PACE_5H="$REPLY_PACE"
+pace_flag "$RATE_7D" "$RATE_7D_RESET" 604800; PACE_7D="$REPLY_PACE"
+
 # ---------- 5. ANSI 컬러 ----------
 RST=$'\033[0m'
+GRN=$'\033[32m'
+RED=$'\033[31m'
 color_for() {
   local pct="$1"
   if   [ "$pct" -ge 80 ]; then COLOR=$'\033[31m'
@@ -225,11 +279,16 @@ if [[ -n "$CC_VERSION" ]]; then VERSION_DISPLAY="🚀 cc v${CC_VERSION}"; else V
 BUDGET_DISPLAY=""
 if [[ "$CFG_BUDGET" == "1" ]]; then
   # 단가 (환경변수 오버라이드 가능). 단위: 나노달러/토큰 (× 10^-9 USD)
-  # Opus 4.x 기본값 — $15 / $75 / $18.75 / $1.50 per Mtok
-  RATE_INPUT="${CC_DASH_RATE_INPUT:-15000}"
-  RATE_OUTPUT="${CC_DASH_RATE_OUTPUT:-75000}"
-  RATE_CACHE_W="${CC_DASH_RATE_CACHE_W:-18750}"
-  RATE_CACHE_R="${CC_DASH_RATE_CACHE_R:-1500}"
+  # 기본은 JSONL 각 라인의 model 필드로 모델군별 단가 자동 적용 (opus $5/$25,
+  # fable·mythos $10/$50, sonnet $3/$15, haiku $1/$5 — cache w 1.25x, r 0.1x).
+  # 오버라이드가 하나라도 있으면 구버전과 동일하게 전 모델 공통 단가로 동작.
+  # 아래 기본값은 model 필드가 없는 라인의 폴백(= Opus 티어 $5/$25).
+  RATE_INPUT="${CC_DASH_RATE_INPUT:-5000}"
+  RATE_OUTPUT="${CC_DASH_RATE_OUTPUT:-25000}"
+  RATE_CACHE_W="${CC_DASH_RATE_CACHE_W:-6250}"
+  RATE_CACHE_R="${CC_DASH_RATE_CACHE_R:-500}"
+  RATE_FIXED=0
+  [[ -n "${CC_DASH_RATE_INPUT}${CC_DASH_RATE_OUTPUT}${CC_DASH_RATE_CACHE_W}${CC_DASH_RATE_CACHE_R}" ]] && RATE_FIXED=1
   BUDGET_LIMIT="${CC_DASH_BUDGET:-15}"
   CACHE_FILE="${CC_DASH_CACHE:-$HOME/.cache/cc-dash-budget}"
   CACHE_TTL=60
@@ -249,16 +308,26 @@ if [[ "$CFG_BUDGET" == "1" ]]; then
     # 오늘 수정된 JSONL만 find 로 선별 → awk 단일 호출로 필터·추출·합산
     # bash 정규식 루프는 거대 JSONL 라인(메가바이트급)에서 매우 느리므로 회피
     _cents=$(find "$HOME/.claude/projects" -name '*.jsonl' -newermt "$TODAY_PREFIX" -print0 2>/dev/null \
-      | xargs -0 awk -v today="$TODAY_PREFIX" \
+      | xargs -0 awk -v today="$TODAY_PREFIX" -v fixed="$RATE_FIXED" \
           -v ri="$RATE_INPUT" -v ro="$RATE_OUTPUT" -v rcw="$RATE_CACHE_W" -v rcr="$RATE_CACHE_R" '
         index($0, "\"timestamp\":\"" today) == 0 { next }
         index($0, "\"usage\"") == 0 { next }
         {
+          ri_ = ri; ro_ = ro; rcw_ = rcw; rcr_ = rcr
+          if (!fixed && match($0, /"model":"[^"]*"/)) {
+            m = substr($0, RSTART+9, RLENGTH-10)
+            if      (index(m, "opus"))                        { ri_=5000;  ro_=25000; rcw_=6250;  rcr_=500 }
+            else if (index(m, "fable") || index(m, "mythos")) { ri_=10000; ro_=50000; rcw_=12500; rcr_=1000 }
+            else if (index(m, "sonnet"))                      { ri_=3000;  ro_=15000; rcw_=3750;  rcr_=300 }
+            else if (index(m, "haiku"))                       { ri_=1000;  ro_=5000;  rcw_=1250;  rcr_=100 }
+          }
+          # substr 오프셋 = 키 프리픽스 길이("key": 따옴표+콜론 포함) — 과거 +1 오프셋
+          # 오프바이원으로 토큰 수 첫 자리가 잘려 일일 비용이 과소집계되던 결함 교정
           s = 0
-          if (match($0, /"input_tokens":[0-9]+/))                s += substr($0, RSTART+16, RLENGTH-16) * ri
-          if (match($0, /"output_tokens":[0-9]+/))               s += substr($0, RSTART+17, RLENGTH-17) * ro
-          if (match($0, /"cache_creation_input_tokens":[0-9]+/)) s += substr($0, RSTART+31, RLENGTH-31) * rcw
-          if (match($0, /"cache_read_input_tokens":[0-9]+/))     s += substr($0, RSTART+27, RLENGTH-27) * rcr
+          if (match($0, /"input_tokens":[0-9]+/))                s += substr($0, RSTART+15, RLENGTH-15) * ri_
+          if (match($0, /"output_tokens":[0-9]+/))               s += substr($0, RSTART+16, RLENGTH-16) * ro_
+          if (match($0, /"cache_creation_input_tokens":[0-9]+/)) s += substr($0, RSTART+30, RLENGTH-30) * rcw_
+          if (match($0, /"cache_read_input_tokens":[0-9]+/))     s += substr($0, RSTART+26, RLENGTH-26) * rcr_
           total += s
         }
         END { printf("%.0f", total / 10000000) }
@@ -281,9 +350,9 @@ fi
 
 # ---------- 6. 출력 조립 ----------
 # 3행으로 분배.
-#   L1 사용량:  model · duration · ctx · token · cost · budget
-#   L2 메타:    perm(opt) · version · git · project · clock (맨 오른쪽)
-#   L3 리밋:    5h · 7d
+#   L1 사용량:  model · duration · api(opt) · ctx · token · cost · lines · budget(opt)
+#   L2 리밋:    now(5h) · week(7d)
+#   L3 메타:    perm(opt) · style(opt) · version · git · project · session · clock (맨 오른쪽)
 # 위젯 CFG_* 가 0 이면 세그먼트가 빠지고 구분자(│)도 남지 않는다.
 L1="" L2="" L3=""
 append() {
@@ -293,15 +362,18 @@ append() {
 }
 [[ "$CFG_MODEL"    == "1" ]] && append L1 "🧠 ${MODEL}"
 [[ "$CFG_DURATION" == "1" ]] && append L1 "⏱  dur ${TIME}"
-[[ "$CFG_CTX"      == "1" ]] && append L1 "🪟 ctx ${CTX_COLOR}${CTX_PCT}%${RST}"
+[[ "$CFG_API_DUR"  == "1" ]] && append L1 "🌐 api ${API_TIME}"
+[[ "$CFG_CTX"      == "1" ]] && append L1 "🪟 ctx ${CTX_COLOR}${CTX_PCT}%${RST}${CTX_ABS}"
 [[ "$CFG_TOKEN"    == "1" ]] && append L1 "💬 token ${TOKEN_FMT}"
 [[ "$CFG_COST"     == "1" ]] && append L1 "💸 cost ${COST_DISPLAY}"
+[[ "$CFG_LINES"    == "1" ]] && append L1 "✏️  ${GRN}+${LINES_ADD}${RST}/${RED}-${LINES_DEL}${RST}"
 [[ -n "$BUDGET_DISPLAY"    ]] && append L1 "${BUDGET_DISPLAY}"
 
-[[ "$CFG_RATE_5H"  == "1" ]] && append L2 "${RATE_5H_ICON} now ${RATE_5H_COLOR}${RATE_5H}%${RST}${TIMER_5H}"
-[[ "$CFG_RATE_7D"  == "1" ]] && append L2 "${RATE_7D_ICON} week ${RATE_7D_COLOR}${RATE_7D}%${RST}${TIMER_7D}"
+[[ "$CFG_RATE_5H"  == "1" ]] && append L2 "${RATE_5H_ICON} now ${RATE_5H_COLOR}${RATE_5H}%${RST}${PACE_5H}${TIMER_5H}"
+[[ "$CFG_RATE_7D"  == "1" ]] && append L2 "${RATE_7D_ICON} week ${RATE_7D_COLOR}${RATE_7D}%${RST}${PACE_7D}${TIMER_7D}"
 
 [[ "$CFG_PERM"    == "1" ]] && append L3 "$PERM_DISPLAY"
+[[ "$CFG_STYLE"   == "1" ]] && append L3 "🎨 style ${STYLE_NAME:-—}"
 [[ "$CFG_VERSION" == "1" ]] && append L3 "$VERSION_DISPLAY"
 [[ "$CFG_GIT"     == "1" ]] && append L3 "$GIT_DISPLAY"
 [[ "$CFG_PROJECT" == "1" ]] && append L3 "$PROJECT_DISPLAY"

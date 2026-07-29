@@ -17,21 +17,24 @@ WIDGETS=(
   "CLOCK:🕐 시각"
   "MODEL:🍋 모델"
   "DURATION:⏱ 경과 시간"
-  "CTX:🪟 ctx %"
+  "API_DUR:🌐 API 소요 시간 (opt-in)"
+  "CTX:🪟 ctx % (+사용/전체)"
   "TOKEN:💬 token"
-  "COST:💸 cost (세션 누적)"
+  "COST:💸 cost (세션 누적, 5분+ 시 ~\$/h)"
+  "LINES:✏️ +추가/-삭제 라인"
   "BUDGET:💰 일일 예산 % (opt-in, JSONL 스캔)"
-  "RATE_5H:⚡/🔥 now(5h) 리밋 + 타이머"
-  "RATE_7D:📅 week(7d) 리밋 + 타이머"
+  "RATE_5H:⏳ now(5h) 리밋 + 타이머 (🔥 페이스 경고)"
+  "RATE_7D:⏳ week(7d) 리밋 + 타이머 (🔥 페이스 경고)"
   "PERM:🔒 권한 모드"
+  "STYLE:🎨 output style (opt-in)"
   "VERSION:🚀 Claude Code 버전"
   "GIT:🔀 git 브랜치"
   "PROJECT:📁 프로젝트"
   "SESSION:🆔 세션 ID"
 )
 
-DEFAULT_KEYS=(CLOCK MODEL DURATION CTX TOKEN COST RATE_5H RATE_7D VERSION GIT)
-DEFAULT_OFF=(BUDGET PERM PROJECT SESSION)
+DEFAULT_KEYS=(CLOCK MODEL DURATION CTX TOKEN COST LINES RATE_5H RATE_7D VERSION GIT)
+DEFAULT_OFF=(BUDGET PERM PROJECT SESSION API_DUR STYLE)
 
 declare -A STATE
 reset_defaults() {
@@ -121,8 +124,8 @@ cc-dash 위젯 ON/OFF
   cc-dash-config.sh reset              기본값 복원
   cc-dash-config.sh all-on | all-off   전체 ON/OFF
 
-KEY (대소문자 무관): CLOCK MODEL DURATION CTX TOKEN COST BUDGET
-                    RATE_5H RATE_7D PERM VERSION GIT PROJECT
+KEY (대소문자 무관): CLOCK MODEL DURATION API_DUR CTX TOKEN COST LINES BUDGET
+                    RATE_5H RATE_7D PERM STYLE VERSION GIT PROJECT SESSION
 EOF
       exit 0;;
     *) printf '알 수 없는 명령: %s ("help" 참고)\n' "$cmd" >&2; exit 2;;
