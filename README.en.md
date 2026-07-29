@@ -134,26 +134,26 @@ After saving, `/ccd list` and `/ccd-setup` resolve to the plugin commands. User-
 
 ## Widget reference
 
-| Key | Default | Example | Row |
-|---|---|---|---|
-| `MODEL`    | on  | `🧠 Opus 4.7 (1M context)`      | 1 |
-| `DURATION` | on  | `⏱  dur 22m23s`                 | 1 |
-| `API_DUR`  | **off** | `🌐 api 4m32s`              | 1 |
-| `CTX`      | on  | `🪟 ctx 25% (50.0K/200.0K)`     | 1 |
-| `TOKEN`    | on  | `💬 token 58.3K`                | 1 |
-| `COST`     | on  | `💸 cost $1.66 (~$4.5/h)`       | 1 |
-| `LINES`    | on  | `✏️  +120/-34`                  | 1 |
-| `BUDGET`   | **off** | `💰 budget $4.21/$15 (28%)`| 1 |
-| `RATE_5H`  | on  | `⏳ now 19% reset 3h8m`         | 2 |
-| `RATE_7D`  | on  | `⏳ week 2% reset 6d22h`        | 2 |
-| `RATE_MODEL` | on | `⏳ Opus 22% reset 4d2h`      | 2 |
-| `PERM`     | **off** | `🔒 perm ask`               | 3 |
-| `STYLE`    | **off** | `🎨 style Explanatory`      | 3 |
-| `VERSION`  | on  | `🚀 cc v2.1.116`                | 3 |
-| `GIT`      | on  | `🔀 git: main` / `🔀 git: main*`| 3 |
-| `PROJECT`  | **off** | `📁 proj: cc-dash`          | 3 |
-| `SESSION`  | **off** | `🆔 ab12cd34`               | 3 |
-| `CLOCK`    | on  | `🕐 2026.04.21 13:03`           | 3 (rightmost) |
+| Key | Default | What it shows | Example | Row |
+|---|---|---|---|---|
+| `MODEL`    | on  | Display name of the active model | `🧠 Opus 4.7 (1M context)`      | 1 |
+| `DURATION` | on  | Wall-clock time since the session started | `⏱  dur 22m23s`                 | 1 |
+| `API_DUR`  | **off** | Cumulative time spent waiting on API calls | `🌐 api 4m32s`              | 1 |
+| `CTX`      | on  | Context usage — appends used/total when the payload carries it | `🪟 ctx 25% (50.0K/200.0K)`     | 1 |
+| `TOKEN`    | on  | Cumulative input tokens for the session | `💬 token 58.3K`                | 1 |
+| `COST`     | on  | Session cost — appends burn rate past 5 minutes | `💸 cost $1.66 (~$4.5/h)`       | 1 |
+| `LINES`    | on  | Code lines added/removed during the session | `✏️  +120/-34`                  | 1 |
+| `BUDGET`   | **off** | Today's spend against a daily budget — JSONL scan, pay-as-you-go plans | `💰 budget $4.21/$15 (28%)`| 1 |
+| `RATE_5H`  | on  | 5-hour limit usage + reset timer (🔥 pace warning) | `⏳ now 19% reset 3h8m`         | 2 |
+| `RATE_7D`  | on  | Weekly (7-day) limit usage + reset timer (🔥 pace warning) | `⏳ week 2% reset 6d22h`        | 2 |
+| `RATE_MODEL` | on | Per-model weekly limits — hidden when the payload has none | `⏳ Opus 22% reset 4d2h`      | 2 |
+| `PERM`     | **off** | Current permission mode (ask·plan·accept·auto·bypass) | `🔒 perm ask`               | 3 |
+| `STYLE`    | **off** | Name of the active output style | `🎨 style Explanatory`      | 3 |
+| `VERSION`  | on  | Running Claude Code version | `🚀 cc v2.1.116`                | 3 |
+| `GIT`      | on  | Current branch — `*` means a merge/rebase is in progress | `🔀 git: main` / `🔀 git: main*`| 3 |
+| `PROJECT`  | **off** | Working directory name | `📁 proj: cc-dash`          | 3 |
+| `SESSION`  | **off** | First 8 characters of the session ID | `🆔 ab12cd34`               | 3 |
+| `CLOCK`    | on  | Current date and time | `🕐 2026.04.21 13:03`           | 3 (rightmost) |
 
 Context %, `now` (5h), `week` (7d), and budget % share the same threshold colors: green → amber (≥50%) → red (≥80%).
 

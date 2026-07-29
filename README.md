@@ -134,26 +134,26 @@ description: alias for /cc-dash:ccd-setup
 
 ## 위젯 레퍼런스
 
-| 키 | 기본 | 예시 | 행 |
-|---|---|---|---|
-| `MODEL`    | on  | `🧠 Opus 4.7 (1M context)`      | 1 |
-| `DURATION` | on  | `⏱  dur 22m23s`                 | 1 |
-| `API_DUR`  | **off** | `🌐 api 4m32s`              | 1 |
-| `CTX`      | on  | `🪟 ctx 25% (50.0K/200.0K)`     | 1 |
-| `TOKEN`    | on  | `💬 token 58.3K`                | 1 |
-| `COST`     | on  | `💸 cost $1.66 (~$4.5/h)`       | 1 |
-| `LINES`    | on  | `✏️  +120/-34`                  | 1 |
-| `BUDGET`   | **off** | `💰 budget $4.21/$15 (28%)`| 1 |
-| `RATE_5H`  | on  | `⏳ now 19% reset 3h8m`         | 2 |
-| `RATE_7D`  | on  | `⏳ week 2% reset 6d22h`        | 2 |
-| `RATE_MODEL` | on | `⏳ Opus 22% reset 4d2h`      | 2 |
-| `PERM`     | **off** | `🔒 perm ask`               | 3 |
-| `STYLE`    | **off** | `🎨 style Explanatory`      | 3 |
-| `VERSION`  | on  | `🚀 cc v2.1.116`                | 3 |
-| `GIT`      | on  | `🔀 git: main` / `🔀 git: main*`| 3 |
-| `PROJECT`  | **off** | `📁 proj: cc-dash`          | 3 |
-| `SESSION`  | **off** | `🆔 ab12cd34`               | 3 |
-| `CLOCK`    | on  | `🕐 2026.04.21 13:03`           | 3 (맨 오른쪽) |
+| 키 | 기본 | 설명 | 예시 | 행 |
+|---|---|---|---|---|
+| `MODEL`    | on  | 현재 모델 표시명 | `🧠 Opus 4.7 (1M context)`      | 1 |
+| `DURATION` | on  | 세션 시작 이후 경과 시간 | `⏱  dur 22m23s`                 | 1 |
+| `API_DUR`  | **off** | API 호출에 쓴 누적 시간 (경과 시간 중 실제 대기분) | `🌐 api 4m32s`              | 1 |
+| `CTX`      | on  | 컨텍스트 사용률 — 페이로드가 주면 사용/전체 토큰 병기 | `🪟 ctx 25% (50.0K/200.0K)`     | 1 |
+| `TOKEN`    | on  | 세션 누적 입력 토큰 | `💬 token 58.3K`                | 1 |
+| `COST`     | on  | 세션 누적 비용 — 5분 이상이면 시간당 소진율 병기 | `💸 cost $1.66 (~$4.5/h)`       | 1 |
+| `LINES`    | on  | 세션 중 추가/삭제한 코드 라인 수 | `✏️  +120/-34`                  | 1 |
+| `BUDGET`   | **off** | 오늘 지출 대비 일일 예산 — JSONL 스캔, 종량제 플랜용 | `💰 budget $4.21/$15 (28%)`| 1 |
+| `RATE_5H`  | on  | 5시간 리밋 사용률 + 리셋 타이머 (🔥 페이스 경고) | `⏳ now 19% reset 3h8m`         | 2 |
+| `RATE_7D`  | on  | 주간(7일) 리밋 사용률 + 리셋 타이머 (🔥 페이스 경고) | `⏳ week 2% reset 6d22h`        | 2 |
+| `RATE_MODEL` | on | 모델별 주간 리밋 — 페이로드에 없으면 자동 숨김 | `⏳ Opus 22% reset 4d2h`      | 2 |
+| `PERM`     | **off** | 현재 권한 모드 (ask·plan·accept·auto·bypass) | `🔒 perm ask`               | 3 |
+| `STYLE`    | **off** | 활성 output style 이름 | `🎨 style Explanatory`      | 3 |
+| `VERSION`  | on  | 실행 중인 Claude Code 버전 | `🚀 cc v2.1.116`                | 3 |
+| `GIT`      | on  | 현재 브랜치 — `*`는 merge/rebase 진행 중 | `🔀 git: main` / `🔀 git: main*`| 3 |
+| `PROJECT`  | **off** | 작업 디렉터리 이름 | `📁 proj: cc-dash`          | 3 |
+| `SESSION`  | **off** | 세션 ID 앞 8자 | `🆔 ab12cd34`               | 3 |
+| `CLOCK`    | on  | 현재 날짜·시각 | `🕐 2026.04.21 13:03`           | 3 (맨 오른쪽) |
 
 컨텍스트 %, `now`(5h), `week`(7d), budget %는 동일한 임계 색상을 공유합니다: 녹색 → 주황(≥50%) → 빨강(≥80%).
 
