@@ -112,6 +112,27 @@ if [[ $# -gt 0 ]]; then
     all-off)
       for e in "${WIDGETS[@]}"; do STATE["${e%%:*}"]=0; done
       save_file; print_status; exit 0;;
+    refresh)
+      # ① budget 캐시 무효화 — 그 외 위젯은 매 렌더 실시간이라 캐시가 없다.
+      cache_file="${CC_DASH_CACHE:-$HOME/.cache/cc-dash-budget}"
+      if [[ -f "$cache_file" ]]; then
+        if rm "$cache_file" 2>/dev/null; then
+          printf 'budget 캐시 삭제: %s\n' "$cache_file"
+        else
+          printf 'warning: budget 캐시 삭제 실패: %s\n' "$cache_file" >&2
+        fi
+      else
+        printf 'budget 캐시 없음 — 다음 렌더에서 새로 계산: %s\n' "$cache_file"
+      fi
+      # ② statusLine 재배선 — 플러그인 업그레이드 시 settings.json 이 구버전
+      # 경로를 가리킨 채로 남는다. setup 은 멱등이라 최신이면 그대로 통과한다.
+      setup_sh="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/cc-dash-setup.sh"
+      if [[ -f "$setup_sh" ]]; then
+        bash "$setup_sh" || printf 'warning: statusLine 재배선 실패 — /cc-dash:ccd-setup 을 직접 실행하세요.\n' >&2
+      else
+        printf 'warning: cc-dash-setup.sh 없음 (%s) — statusLine 재배선 생략\n' "$setup_sh" >&2
+      fi
+      exit 0;;
     -h|--help|help)
       cat <<EOF
 cc-dash 위젯 ON/OFF
@@ -124,6 +145,7 @@ cc-dash 위젯 ON/OFF
   cc-dash-config.sh off KEY [KEY …]    끄기
   cc-dash-config.sh reset              기본값 복원
   cc-dash-config.sh all-on | all-off   전체 ON/OFF
+  cc-dash-config.sh refresh            budget 캐시 비우기 + statusLine 경로 재배선
 
 KEY (대소문자 무관): CLOCK MODEL DURATION API_DUR CTX TOKEN COST LINES BUDGET
                     RATE_5H RATE_7D RATE_MODEL PERM STYLE VERSION GIT PROJECT SESSION

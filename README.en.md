@@ -53,7 +53,7 @@ The `/cc-dash:ccd` slash command and the `cc-dash-config.sh` / `statusline.sh` s
 /cc-dash:ccd-setup
 ```
 
-Claude Code's plugin manifest has no `statusLine` field, so the first-time wiring is a one-shot helper command that writes the correct `statusLine` entry into `~/.claude/settings.json` for you. Re-run it after every plugin upgrade — the installed path carries the version (`.../cc-dash/1.0.0/...`) and changes on each update.
+Claude Code's plugin manifest has no `statusLine` field, so the first-time wiring is a one-shot helper command that writes the correct `statusLine` entry into `~/.claude/settings.json` for you. Re-run it after every plugin upgrade — the installed path carries the version (`.../cc-dash/1.0.0/...`) and changes on each update. `/cc-dash:ccd refresh` performs the same re-wiring, so either command works.
 
 > **macOS note:** the system `/bin/bash` is frozen at 3.2 and cannot run cc-dash (which uses `printf '%(…)T'` and `local -n`, requiring bash ≥ 4.3). Install a current bash with `brew install bash` *before* running `/cc-dash:ccd-setup` — on macOS the setup script always wires an **absolute** bash path into `settings.json` (PATH bash if it is ≥ 4.3, otherwise `/opt/homebrew/bin/bash` on Apple Silicon or `/usr/local/bin/bash` on Intel), so the statusLine keeps working even when Claude Code is launched from the GUI with a minimal PATH. If no compatible bash is found, the statusLine renders a one-line warning instead of staying blank. The `/cc-dash:ccd` widget toggle needs the brew bash too — on bash 3.2 it refuses with a clear message instead of failing cryptically.
 
@@ -92,6 +92,7 @@ Claude Code plugin slash commands require the `<plugin-name>:` namespace prefix,
 | `/cc-dash:ccd off RATE_5H RATE_7D` | Force off |
 | `/cc-dash:ccd reset` | Back to defaults |
 | `/cc-dash:ccd all-on` / `/cc-dash:ccd all-off` | Bulk |
+| `/cc-dash:ccd refresh` | Drop the budget cache + re-wire the statusLine path |
 | `/cc-dash:ccd help` | Usage |
 
 Widget keys (case-insensitive):
@@ -112,7 +113,7 @@ If typing `/cc-dash:ccd` every time is tedious, create user-level aliases in `~/
 ```markdown
 ---
 description: alias for /cc-dash:ccd
-argument-hint: "[list|toggle|on|off|reset|all-on|all-off] [KEY ...]"
+argument-hint: "[list|toggle|on|off|reset|all-on|all-off|refresh] [KEY ...]"
 ---
 
 /cc-dash:ccd $ARGUMENTS
@@ -169,7 +170,7 @@ Usage extras (no separate toggles — they ride their parent widget):
 
 ### Budget widget (opt-in)
 
-`/cc-dash:ccd on BUDGET` enables a daily-spend tracker. It walks today's `~/.claude/projects/**/*.jsonl` and sums token usage × model rates. The result is cached for 60 seconds at `~/.cache/cc-dash-budget`.
+`/cc-dash:ccd on BUDGET` enables a daily-spend tracker. It walks today's `~/.claude/projects/**/*.jsonl` and sums token usage × model rates. The result is cached for 60 seconds at `~/.cache/cc-dash-budget`. Run `/cc-dash:ccd refresh` to recompute before the cache expires.
 
 > **Note:** The budget widget is designed for pay-per-token plans. If you use a Claude subscription plan, this widget will not reflect actual costs.
 
@@ -264,6 +265,9 @@ time (echo '{…}' | bash scripts/statusline.sh)
 
 # Everything on
 CC_DASH_SHOW_SESSION=1 CC_DASH_SHOW_BUDGET=1 bash scripts/statusline.sh <<< '{…}'
+
+# refresh — exercise it without touching your real settings.json / cache
+CC_DASH_SETTINGS=/tmp/x.json CC_DASH_CACHE=/tmp/x-cache bash scripts/cc-dash-config.sh refresh
 ```
 
 Expected output for the default render (no `widgets.conf` yet — clock and git widgets reflect your environment; the `resets_at` timestamps above are in the past, so no `reset` timers appear):

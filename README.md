@@ -53,7 +53,7 @@ Claude Code는 마켓플레이스를 통해 플러그인을 설치하므로 2단
 /cc-dash:ccd-setup
 ```
 
-Claude Code 플러그인 매니페스트에는 `statusLine` 필드가 없어서, 최초 1회 배선은 `~/.claude/settings.json`에 올바른 `statusLine` 항목을 대신 써 주는 원샷 헬퍼 커맨드로 처리합니다. 플러그인 업그레이드 후에는 다시 실행하세요 — 설치 경로에 버전이 포함되어(`.../cc-dash/1.0.0/...`) 업데이트마다 바뀝니다.
+Claude Code 플러그인 매니페스트에는 `statusLine` 필드가 없어서, 최초 1회 배선은 `~/.claude/settings.json`에 올바른 `statusLine` 항목을 대신 써 주는 원샷 헬퍼 커맨드로 처리합니다. 플러그인 업그레이드 후에는 다시 실행하세요 — 설치 경로에 버전이 포함되어(`.../cc-dash/1.0.0/...`) 업데이트마다 바뀝니다. `/cc-dash:ccd refresh`도 같은 재배선을 수행하므로 둘 중 아무거나 쓰면 됩니다.
 
 > **macOS 참고:** 시스템 `/bin/bash`는 3.2에 고정되어 있어 cc-dash를 실행할 수 없습니다(`printf '%(…)T'`·`local -n` 사용, bash ≥ 4.3 필요). `/cc-dash:ccd-setup` 실행 *전에* `brew install bash`로 최신 bash를 설치하세요 — macOS에서는 셋업 스크립트가 항상 **절대경로** bash를 `settings.json`에 배선합니다(PATH의 bash가 4.3 이상이면 그 경로, 아니면 Apple Silicon은 `/opt/homebrew/bin/bash`, Intel은 `/usr/local/bin/bash`). 덕분에 GUI에서 최소 PATH로 실행된 Claude Code에서도 statusLine이 계속 동작합니다. 호환 bash를 찾지 못하면 statusLine이 빈 줄 대신 한 줄 경고를 렌더링합니다. `/cc-dash:ccd` 위젯 토글에도 brew bash가 필요합니다 — bash 3.2에서는 암호 같은 오류 대신 명확한 메시지와 함께 거부합니다.
 
@@ -92,6 +92,7 @@ Claude Code 플러그인 슬래시 커맨드는 `<plugin-name>:` 네임스페이
 | `/cc-dash:ccd off RATE_5H RATE_7D` | 강제 OFF |
 | `/cc-dash:ccd reset` | 기본값 복원 |
 | `/cc-dash:ccd all-on` / `/cc-dash:ccd all-off` | 일괄 ON/OFF |
+| `/cc-dash:ccd refresh` | budget 캐시 비우기 + statusLine 경로 재배선 |
 | `/cc-dash:ccd help` | 사용법 |
 
 위젯 키(대소문자 무관):
@@ -112,7 +113,7 @@ RATE_5H  RATE_7D  RATE_MODEL  PERM  STYLE  VERSION  GIT  PROJECT  SESSION
 ```markdown
 ---
 description: alias for /cc-dash:ccd
-argument-hint: "[list|toggle|on|off|reset|all-on|all-off] [KEY ...]"
+argument-hint: "[list|toggle|on|off|reset|all-on|all-off|refresh] [KEY ...]"
 ---
 
 /cc-dash:ccd $ARGUMENTS
@@ -169,7 +170,7 @@ description: alias for /cc-dash:ccd-setup
 
 ### Budget 위젯 (opt-in)
 
-`/cc-dash:ccd on BUDGET`으로 일일 지출 트래커를 켭니다. 오늘의 `~/.claude/projects/**/*.jsonl`을 순회하며 토큰 사용량 × 모델 단가를 합산합니다. 결과는 `~/.cache/cc-dash-budget`에 60초간 캐시됩니다.
+`/cc-dash:ccd on BUDGET`으로 일일 지출 트래커를 켭니다. 오늘의 `~/.claude/projects/**/*.jsonl`을 순회하며 토큰 사용량 × 모델 단가를 합산합니다. 결과는 `~/.cache/cc-dash-budget`에 60초간 캐시됩니다. 캐시가 만료되기 전에 갱신하려면 `/cc-dash:ccd refresh`를 실행하세요.
 
 > **참고:** budget 위젯은 토큰 종량제 플랜용으로 설계되었습니다. Claude 구독 플랜을 쓴다면 실제 비용을 반영하지 않습니다.
 
@@ -264,6 +265,9 @@ time (echo '{…}' | bash scripts/statusline.sh)
 
 # 전체 위젯 ON
 CC_DASH_SHOW_SESSION=1 CC_DASH_SHOW_BUDGET=1 bash scripts/statusline.sh <<< '{…}'
+
+# refresh — 실제 settings.json / 캐시를 건드리지 않고 확인
+CC_DASH_SETTINGS=/tmp/x.json CC_DASH_CACHE=/tmp/x-cache bash scripts/cc-dash-config.sh refresh
 ```
 
 기본 렌더의 기대 출력(`widgets.conf`가 아직 없는 상태 — clock·git 위젯은 사용자 환경을 반영하며, 위 `resets_at`은 과거 시각이라 `reset` 타이머가 표시되지 않습니다):
