@@ -1,7 +1,9 @@
 # cc-dash
 
-**A fork-free, zero-dependency statusLine for Claude Code.**
-17 widgets — model, duration, API duration, context, tokens, cost, lines changed, budget, rate limits (incl. per-model weekly), permission, output style, version, git, project, session, clock — rendered in three rows. Toggle any widget with `/cc-dash:ccd`.
+**한국어** | [English](README.en.md)
+
+**fork 없는 무의존성 Claude Code statusLine.**
+17개 위젯 — 모델, 경과 시간, API 시간, 컨텍스트, 토큰, 비용, 변경 라인, 예산, 리밋(모델별 주간 포함), 권한, output style, 버전, git, 프로젝트, 세션, 시각 — 을 3행으로 렌더링합니다. `/cc-dash:ccd`로 위젯별 ON/OFF.
 
 ```
 🧠 Opus 4.7 (1M context) │ ⏱  dur 22m0s │ 🪟 ctx 25% │ 💬 token 50.0K │ 💸 cost $0.50 │ ✏️  +120/-34
@@ -11,51 +13,51 @@
 
 ---
 
-## Why
+## 왜 cc-dash인가
 
-Most statusLine scripts fork `jq`, `awk`, `date`, `git` every second and leave your shell wheezing. cc-dash is **pure bash built-ins on the fast path** (bash ≥ 4.3) — no forks, no `cat`, no `sed`. The one exception is the opt-in budget widget, which uses a single `awk` call with a 60-second cache.
+대부분의 statusLine 스크립트는 매초 `jq`, `awk`, `date`, `git`을 fork해 셸을 무겁게 만듭니다. cc-dash는 **fast path가 순수 bash 내장 명령**(bash ≥ 4.3)입니다 — fork 없음, `cat` 없음, `sed` 없음. 유일한 예외는 opt-in budget 위젯으로, 60초 캐시와 함께 `awk`를 1회만 호출합니다.
 
-L1 is automatically clipped to terminal width (respects `$COLUMNS`) so L2 and L3 are always visible.
-
----
-
-## Features
-
-- **17 widgets, all toggle-able** — `/cc-dash:ccd toggle BUDGET`, `/cc-dash:ccd off RATE_7D`, `/cc-dash:ccd reset`.
-- **3-row layout** — usage on row 1, rate limits on row 2, meta + clock on row 3.
-- **Self-labeling** — every icon has a short English tag so nothing is cryptic.
-- **Context %, now (5h) / week (7d) rate limits, token count, session cost** — all parsed from the statusLine JSON payload Claude Code provides.
-- **Threshold colors** — ≥50% amber, ≥80% red. `⏳` flips to `⌛` when quota is hot; 🔥 appears when usage runs ahead of the window's reset pace.
-- **Git branch** + in-progress indicator (`*` for merge/rebase).
-- **Optional budget widget** — scans today's JSONL logs to track daily spend against `$CC_DASH_BUDGET`.
-- **PROJECT and SESSION** as separate toggle-able widgets.
+1행은 터미널 폭(`$COLUMNS`)에 맞춰 자동으로 잘리므로 2·3행은 항상 보입니다.
 
 ---
 
-## Install
+## 주요 기능
 
-### 1. As a plugin
+- **17개 위젯 전부 토글 가능** — `/cc-dash:ccd toggle BUDGET`, `/cc-dash:ccd off RATE_7D`, `/cc-dash:ccd reset`.
+- **3행 레이아웃** — 1행 사용량, 2행 리밋, 3행 메타 + 시계.
+- **셀프 라벨링** — 모든 아이콘에 짧은 영문 태그가 붙어 있어 의미가 헷갈리지 않습니다.
+- **컨텍스트 %, now(5h)/week(7d) 리밋, 토큰 수, 세션 비용** — 전부 Claude Code가 제공하는 statusLine JSON 페이로드에서 파싱합니다.
+- **임계 색상** — ≥50% 주황, ≥80% 빨강. 쿼터가 뜨거우면 `⏳`가 `⌛`로 바뀌고, 사용률이 리셋 페이스보다 앞서면 🔥가 붙습니다.
+- **Git 브랜치** + 진행 중 표시(merge/rebase 시 `*`).
+- **선택형 budget 위젯** — 오늘의 JSONL 로그를 스캔해 `$CC_DASH_BUDGET` 대비 일일 지출을 추적합니다.
+- **PROJECT / SESSION** 별도 토글 위젯.
 
-Claude Code installs plugins via marketplaces, so it's a two-step flow — add the repo as a marketplace first, then install the `cc-dash` plugin from it:
+---
+
+## 설치
+
+### 1. 플러그인으로
+
+Claude Code는 마켓플레이스를 통해 플러그인을 설치하므로 2단계입니다 — 먼저 저장소를 마켓플레이스로 등록한 뒤, 거기서 `cc-dash` 플러그인을 설치합니다:
 
 ```
 /plugin marketplace add ChangSol/claudecode-dashboard
 /plugin install cc-dash@claudecode-dashboard
 ```
 
-The `/cc-dash:ccd` slash command and the `cc-dash-config.sh` / `statusline.sh` scripts ship inside the plugin.
+`/cc-dash:ccd` 슬래시 커맨드와 `cc-dash-config.sh` / `statusline.sh` 스크립트는 플러그인에 포함되어 있습니다.
 
-### 2. Wire up the statusLine
+### 2. statusLine 배선
 
 ```
 /cc-dash:ccd-setup
 ```
 
-Claude Code's plugin manifest has no `statusLine` field, so the first-time wiring is a one-shot helper command that writes the correct `statusLine` entry into `~/.claude/settings.json` for you. Re-run it after every plugin upgrade — the installed path carries the version (`.../cc-dash/1.0.0/...`) and changes on each update.
+Claude Code 플러그인 매니페스트에는 `statusLine` 필드가 없어서, 최초 1회 배선은 `~/.claude/settings.json`에 올바른 `statusLine` 항목을 대신 써 주는 원샷 헬퍼 커맨드로 처리합니다. 플러그인 업그레이드 후에는 다시 실행하세요 — 설치 경로에 버전이 포함되어(`.../cc-dash/1.0.0/...`) 업데이트마다 바뀝니다.
 
-> **macOS note:** the system `/bin/bash` is frozen at 3.2 and cannot run cc-dash (which uses `printf '%(…)T'` and `local -n`, requiring bash ≥ 4.3). Install a current bash with `brew install bash` *before* running `/cc-dash:ccd-setup` — on macOS the setup script always wires an **absolute** bash path into `settings.json` (PATH bash if it is ≥ 4.3, otherwise `/opt/homebrew/bin/bash` on Apple Silicon or `/usr/local/bin/bash` on Intel), so the statusLine keeps working even when Claude Code is launched from the GUI with a minimal PATH. If no compatible bash is found, the statusLine renders a one-line warning instead of staying blank. The `/cc-dash:ccd` widget toggle needs the brew bash too — on bash 3.2 it refuses with a clear message instead of failing cryptically.
+> **macOS 참고:** 시스템 `/bin/bash`는 3.2에 고정되어 있어 cc-dash를 실행할 수 없습니다(`printf '%(…)T'`·`local -n` 사용, bash ≥ 4.3 필요). `/cc-dash:ccd-setup` 실행 *전에* `brew install bash`로 최신 bash를 설치하세요 — macOS에서는 셋업 스크립트가 항상 **절대경로** bash를 `settings.json`에 배선합니다(PATH의 bash가 4.3 이상이면 그 경로, 아니면 Apple Silicon은 `/opt/homebrew/bin/bash`, Intel은 `/usr/local/bin/bash`). 덕분에 GUI에서 최소 PATH로 실행된 Claude Code에서도 statusLine이 계속 동작합니다. 호환 bash를 찾지 못하면 statusLine이 빈 줄 대신 한 줄 경고를 렌더링합니다. `/cc-dash:ccd` 위젯 토글에도 brew bash가 필요합니다 — bash 3.2에서는 암호 같은 오류 대신 명확한 메시지와 함께 거부합니다.
 
-If you'd rather edit by hand, add this block to `~/.claude/settings.json` with the current installed path (see `/plugin` for the exact location):
+직접 편집을 선호하면 현재 설치 경로로 아래 블록을 `~/.claude/settings.json`에 추가하세요(정확한 위치는 `/plugin` 참조):
 
 ```json
 {
@@ -66,44 +68,44 @@ If you'd rather edit by hand, add this block to `~/.claude/settings.json` with t
 }
 ```
 
-On Windows use forward slashes (e.g. `C:/Users/.../plugins/cache/claudecode-dashboard/cc-dash/1.0.0/scripts/statusline.sh`). On macOS replace the leading `bash` with the absolute brew bash path (e.g. `'/opt/homebrew/bin/bash' '<path>/statusline.sh'`) — a plain `bash` resolves to the 3.2 system bash when Claude Code is launched from the GUI.
+Windows에서는 슬래시를 사용하세요(예: `C:/Users/.../plugins/cache/claudecode-dashboard/cc-dash/1.0.0/scripts/statusline.sh`). macOS에서는 맨 앞의 `bash`를 brew bash 절대경로로 바꾸세요(예: `'/opt/homebrew/bin/bash' '<path>/statusline.sh'`) — GUI에서 실행된 Claude Code에서는 순수 `bash`가 3.2 시스템 bash로 해석됩니다.
 
-### 3. Without the plugin (vendored checkout)
+### 3. 플러그인 없이 (체크아웃 방식)
 
 ```bash
 git clone https://github.com/ChangSol/claudecode-dashboard ~/cc-dash
 ```
 
-Then point `statusLine.command` at `~/cc-dash/scripts/statusline.sh` and — if you want the toggle command — copy `commands/ccd.md` to `~/.claude/commands/` and rewrite the script paths to your checkout.
+그 다음 `statusLine.command`를 `~/cc-dash/scripts/statusline.sh`로 지정하고, 토글 커맨드가 필요하면 `commands/ccd.md`를 `~/.claude/commands/`에 복사한 뒤 스크립트 경로를 체크아웃 위치로 수정하세요.
 
 ---
 
-## `/cc-dash:ccd` command
+## `/cc-dash:ccd` 커맨드
 
-Claude Code plugin slash commands require the `<plugin-name>:` namespace prefix, so every invocation is `/cc-dash:ccd …` (the short `/ccd` form isn't routed). If you want the shorter form, create a user-level alias at `~/.claude/commands/ccd.md` — see [the alias note](#shorter-command-aliases-optional) below.
+Claude Code 플러그인 슬래시 커맨드는 `<plugin-name>:` 네임스페이스 접두사가 필수라 모든 호출은 `/cc-dash:ccd …` 형태입니다(짧은 `/ccd`는 라우팅되지 않음). 짧은 형태를 원하면 `~/.claude/commands/ccd.md`에 사용자 레벨 별칭을 만드세요 — 아래 [별칭 안내](#짧은-커맨드-별칭-선택)를 참조하세요.
 
-| Usage | What it does |
+| 사용법 | 동작 |
 |---|---|
-| `/cc-dash:ccd list` *(or `ls`, `status`)* | Show every widget with ON/off |
-| `/cc-dash:ccd toggle CLOCK GIT` | Toggle one or more widgets |
-| `/cc-dash:ccd on BUDGET` | Force on |
-| `/cc-dash:ccd off RATE_5H RATE_7D` | Force off |
-| `/cc-dash:ccd reset` | Back to defaults |
-| `/cc-dash:ccd all-on` / `/cc-dash:ccd all-off` | Bulk |
-| `/cc-dash:ccd help` | Usage |
+| `/cc-dash:ccd list` *(또는 `ls`, `status`)* | 전체 위젯 ON/off 표시 |
+| `/cc-dash:ccd toggle CLOCK GIT` | 위젯 1개 이상 토글 |
+| `/cc-dash:ccd on BUDGET` | 강제 ON |
+| `/cc-dash:ccd off RATE_5H RATE_7D` | 강제 OFF |
+| `/cc-dash:ccd reset` | 기본값 복원 |
+| `/cc-dash:ccd all-on` / `/cc-dash:ccd all-off` | 일괄 ON/OFF |
+| `/cc-dash:ccd help` | 사용법 |
 
-Widget keys (case-insensitive):
+위젯 키(대소문자 무관):
 
 ```
 CLOCK  MODEL  DURATION  API_DUR  CTX  TOKEN  COST  LINES  BUDGET
 RATE_5H  RATE_7D  RATE_MODEL  PERM  STYLE  VERSION  GIT  PROJECT  SESSION
 ```
 
-State is persisted at `~/.config/cc-dash/widgets.conf` (override with `CC_DASH_CONFIG`). The file is plain `KEY=0/1` — editable by hand.
+상태는 `~/.config/cc-dash/widgets.conf`에 저장됩니다(`CC_DASH_CONFIG`로 재정의 가능). 파일은 순수 `KEY=0/1` 형식이라 직접 편집해도 됩니다.
 
-### Shorter command aliases (optional)
+### 짧은 커맨드 별칭 (선택)
 
-If typing `/cc-dash:ccd` every time is tedious, create user-level aliases in `~/.claude/commands/`:
+매번 `/cc-dash:ccd`를 입력하기 번거로우면 `~/.claude/commands/`에 사용자 레벨 별칭을 만드세요:
 
 `~/.claude/commands/ccd.md`:
 
@@ -126,13 +128,13 @@ description: alias for /cc-dash:ccd-setup
 /cc-dash:ccd-setup
 ```
 
-After saving, `/ccd list` and `/ccd-setup` resolve to the plugin commands. User-level commands are personal, not shipped by the plugin, so anyone who wants the short form opts in once.
+저장 후에는 `/ccd list`와 `/ccd-setup`이 플러그인 커맨드로 연결됩니다. 사용자 레벨 커맨드는 개인 설정이며 플러그인에 포함되지 않으므로, 짧은 형태를 원하는 사람이 각자 1회 설정합니다.
 
 ---
 
-## Widget reference
+## 위젯 레퍼런스
 
-| Key | Default | Example | Row |
+| 키 | 기본 | 예시 | 행 |
 |---|---|---|---|
 | `MODEL`    | on  | `🧠 Opus 4.7 (1M context)`      | 1 |
 | `DURATION` | on  | `⏱  dur 22m23s`                 | 1 |
@@ -151,119 +153,120 @@ After saving, `/ccd list` and `/ccd-setup` resolve to the plugin commands. User-
 | `GIT`      | on  | `🔀 git: main` / `🔀 git: main*`| 3 |
 | `PROJECT`  | **off** | `📁 proj: cc-dash`          | 3 |
 | `SESSION`  | **off** | `🆔 ab12cd34`               | 3 |
-| `CLOCK`    | on  | `🕐 2026.04.21 13:03`           | 3 (rightmost) |
+| `CLOCK`    | on  | `🕐 2026.04.21 13:03`           | 3 (맨 오른쪽) |
 
-Context %, `now` (5h), `week` (7d), and budget % share the same threshold colors: green → amber (≥50%) → red (≥80%).
+컨텍스트 %, `now`(5h), `week`(7d), budget %는 동일한 임계 색상을 공유합니다: 녹색 → 주황(≥50%) → 빨강(≥80%).
 
-Usage extras (no separate toggles — they ride their parent widget):
-- `CTX` appends `(used/total)` when the payload carries `context_window_size`.
-- `COST` appends an hourly burn-rate estimate (`~$X.X/h`) once the session is 5+ minutes old.
-- `RATE_5H` / `RATE_7D` append 🔥 when your usage % is ≥15 points ahead of the window's elapsed time — you are on pace to exhaust the limit before it resets.
-- `RATE_MODEL` renders one segment per model-scoped weekly window in the payload (`seven_day_opus`, `seven_day_sonnet`, …) with the same colors/timer/🔥 treatment, labeled by model (`Opus 22%`). Hidden automatically when the payload carries none — Claude Code only sends these on plans with per-model weekly limits.
+사용량 부가 표시(별도 토글 없음 — 부모 위젯을 따라갑니다):
+- `CTX`는 페이로드에 `context_window_size`가 오면 `(사용/전체)`를 병기합니다.
+- `COST`는 세션이 5분을 넘으면 시간당 소진율 추정치(`~$X.X/h`)를 병기합니다.
+- `RATE_5H` / `RATE_7D`는 사용률이 윈도 경과율보다 15%p 이상 앞서면 🔥를 붙입니다 — 리셋 전에 리밋을 소진할 페이스라는 뜻입니다.
+- `RATE_MODEL`은 페이로드의 모델별 주간 윈도(`seven_day_opus`, `seven_day_sonnet`, …)마다 세그먼트 하나를 렌더링합니다 — 색상/타이머/🔥 처리는 동일하고 모델명으로 라벨링됩니다(`Opus 22%`). 페이로드에 없으면 자동 숨김 — Claude Code는 모델별 주간 리밋이 있는 플랜에서만 이 필드를 보냅니다.
 
 ---
 
-## Customization
+## 커스터마이징
 
-### Budget widget (opt-in)
+### Budget 위젯 (opt-in)
 
-`/cc-dash:ccd on BUDGET` enables a daily-spend tracker. It walks today's `~/.claude/projects/**/*.jsonl` and sums token usage × model rates. The result is cached for 60 seconds at `~/.cache/cc-dash-budget`.
+`/cc-dash:ccd on BUDGET`으로 일일 지출 트래커를 켭니다. 오늘의 `~/.claude/projects/**/*.jsonl`을 순회하며 토큰 사용량 × 모델 단가를 합산합니다. 결과는 `~/.cache/cc-dash-budget`에 60초간 캐시됩니다.
 
-> **Note:** The budget widget is designed for pay-per-token plans. If you use a Claude subscription plan, this widget will not reflect actual costs.
+> **참고:** budget 위젯은 토큰 종량제 플랜용으로 설계되었습니다. Claude 구독 플랜을 쓴다면 실제 비용을 반영하지 않습니다.
 
-Rates are applied **per model**: each JSONL line's `model` field selects the price tier — Opus $5/$25, Fable/Mythos $10/$50, Sonnet $3/$15, Haiku $1/$5 per Mtok (cache write 1.25×, cache read 0.1× of input). Lines without a `model` field fall back to the Opus tier.
+단가는 **모델별**로 적용됩니다: JSONL 각 라인의 `model` 필드가 가격 티어를 결정합니다 — Opus $5/$25, Fable/Mythos $10/$50, Sonnet $3/$15, Haiku $1/$5 per Mtok(캐시 쓰기 1.25×, 캐시 읽기는 input의 0.1×). `model` 필드가 없는 라인은 Opus 티어로 폴백합니다.
 
-| Variable | Default | Meaning |
+| 변수 | 기본값 | 의미 |
 |---|---|---|
-| `CC_DASH_BUDGET`       | `15`    | Daily budget in USD |
+| `CC_DASH_BUDGET`       | `15`    | 일일 예산(USD) |
 | `CC_DASH_RATE_INPUT`   | `5000`  | $/Mtok × 1000, input |
 | `CC_DASH_RATE_OUTPUT`  | `25000` | output |
 | `CC_DASH_RATE_CACHE_W` | `6250`  | cache_creation |
 | `CC_DASH_RATE_CACHE_R` | `500`   | cache_read |
-| `CC_DASH_CACHE`        | `~/.cache/cc-dash-budget` | cache file path |
-| `CC_DASH_CONFIG`       | `~/.config/cc-dash/widgets.conf` | widget toggle file |
+| `CC_DASH_CACHE`        | `~/.cache/cc-dash-budget` | 캐시 파일 경로 |
+| `CC_DASH_CONFIG`       | `~/.config/cc-dash/widgets.conf` | 위젯 토글 파일 |
 
-Setting **any** `CC_DASH_RATE_*` variable switches back to legacy single-rate mode: your rates apply to every line regardless of model (useful for discounted/introductory pricing). Unset variables fall back to the defaults in the table above — set all four for fully custom pricing.
+`CC_DASH_RATE_*` 변수를 **하나라도** 설정하면 레거시 단일 단가 모드로 전환됩니다: 모델과 무관하게 모든 라인에 해당 단가가 적용됩니다(할인/인트로 가격에 유용). 설정하지 않은 변수는 위 표의 기본값으로 폴백하므로, 완전한 커스텀 가격을 원하면 4개를 모두 설정하세요.
 
-### Terminal width clipping
+### 터미널 폭 클리핑
 
-L1 is clipped to `$COLUMNS` when set, so L2 and L3 are always visible on narrow terminals. To enable auto-detection, add to `~/.bashrc`:
+`$COLUMNS`가 설정되어 있으면 1행이 잘려서 좁은 터미널에서도 2·3행이 항상 보입니다. 자동 감지를 켜려면 `~/.bashrc`에 추가하세요:
 
 ```bash
 export COLUMNS
 ```
 
-### Legacy env-var toggles
+### 레거시 환경변수 토글
 
-The old opt-in env vars still work and override config-file state:
-- `CC_DASH_SHOW_SESSION=1` → `PROJECT` + `SESSION` on
-- `CC_DASH_SHOW_BUDGET=1`  → `BUDGET` on
-
----
-
-## Performance notes
-
-- **Fast path: zero forks.** No `jq`, `awk`, `sed`, `cat`, or `date` on normal renders — only bash built-ins (`printf -v '%(…)T'`, `[[`, `read`).
-- **Budget widget**: one `find -newermt` + one `awk` only when cache is cold (~1 s). Cache hits are a single `read` from the cache file (~5 ms).
-- **Trailing-whitespace trick**: every space is replaced with NBSP (` `) before output, so terminals don't trim and the Claude Code dim attribute doesn't bleed into the line (`\x1b[0m` prefix).
+구버전 opt-in 환경변수도 여전히 동작하며 설정 파일 상태를 재정의합니다:
+- `CC_DASH_SHOW_SESSION=1` → `PROJECT` + `SESSION` ON
+- `CC_DASH_SHOW_BUDGET=1`  → `BUDGET` ON
 
 ---
 
-## Compatibility
+## 성능 노트
 
-- **Shell**: bash ≥ 4.3 (needs `printf -v '%(…)T'` from 4.2 and `local -n` namerefs from 4.3). macOS `/bin/bash` is 3.2 and is **not** supported — `brew install bash` and let `/cc-dash:ccd-setup` wire the absolute path. Works under Git Bash on Windows.
-- **Claude Code**: uses the `statusLine` hook JSON payload (model, cost, rate limits, session fields). Any Claude Code build that emits those fields is supported.
-- **Platforms**: Linux, macOS (with brew bash), Windows (Git Bash / WSL).
-
----
-
-## Limitations
-
-- **Git dirty is a heuristic.** The script checks for `MERGE_HEAD` / `ORIG_HEAD` / `rebase-merge` to decide whether to append `*`. A real `git status` would require a fork.
-- **Budget rates are manual.** JSONL logs don't store a `cost_usd` field directly; cc-dash multiplies token counts by per-model rates. Keep the env vars in sync with Anthropic's pricing.
-- **statusLine is not plugin-declared.** Claude Code's plugin schema currently exposes no `statusLine` field, so users have to add a two-line entry to their own `settings.json` after installing the plugin.
-- **JSONL schema drift.** If Claude Code renames usage fields in the transcript, the `awk` regexes in the budget widget need to be updated.
+- **Fast path: fork 0회.** 일반 렌더에서 `jq`, `awk`, `sed`, `cat`, `date` 없음 — bash 내장만 사용합니다(`printf -v '%(…)T'`, `[[`, `read`).
+- **Budget 위젯**: 캐시가 식었을 때만 `find -newermt` 1회 + `awk` 1회(~1초). 캐시 히트는 캐시 파일 `read` 1회(~5ms)입니다.
+- **후행 공백 트릭**: 출력 전에 모든 공백을 NBSP(` `)로 치환해 터미널이 공백을 잘라내지 않고, Claude Code의 dim 속성이 줄에 번지지 않게 합니다(`\x1b[0m` 접두).
 
 ---
 
-## Project layout
+## 호환성
+
+- **셸**: bash ≥ 4.3 (4.2의 `printf -v '%(…)T'`와 4.3의 `local -n` nameref 필요). macOS `/bin/bash`는 3.2라 **미지원** — `brew install bash` 후 `/cc-dash:ccd-setup`이 절대경로를 배선하게 하세요. Windows Git Bash에서 동작합니다.
+- **Claude Code**: `statusLine` 훅 JSON 페이로드(모델, 비용, 리밋, 세션 필드)를 사용합니다. 해당 필드를 내보내는 모든 Claude Code 빌드를 지원합니다.
+- **플랫폼**: Linux, macOS(brew bash), Windows(Git Bash / WSL).
+
+---
+
+## 한계
+
+- **Git dirty는 휴리스틱입니다.** `MERGE_HEAD` / `ORIG_HEAD` / `rebase-merge` 존재 여부로 `*`를 결정합니다. 실제 `git status`는 fork가 필요합니다.
+- **Budget 단가는 수동 관리입니다.** JSONL 로그에는 `cost_usd` 필드가 직접 저장되지 않아 cc-dash가 토큰 수 × 모델별 단가로 계산합니다. 환경변수를 Anthropic 가격과 동기화하세요.
+- **statusLine은 플러그인이 선언할 수 없습니다.** Claude Code 플러그인 스키마에 현재 `statusLine` 필드가 없어, 설치 후 사용자가 직접 `settings.json`에 두 줄을 추가해야 합니다.
+- **JSONL 스키마 드리프트.** Claude Code가 트랜스크립트의 usage 필드명을 바꾸면 budget 위젯의 `awk` 정규식을 갱신해야 합니다.
+
+---
+
+## 프로젝트 구조
 
 ```
-claudecode-dashboard/         # repo root (= marketplace)
+claudecode-dashboard/         # 저장소 루트 (= 마켓플레이스)
 ├── .claude-plugin/
-│   └── marketplace.json      # marketplace manifest (lists plugins)
+│   └── marketplace.json      # 마켓플레이스 매니페스트 (플러그인 목록)
 ├── plugins/
-│   └── cc-dash/              # the cc-dash plugin
+│   └── cc-dash/              # cc-dash 플러그인
 │       ├── .claude-plugin/
-│       │   └── plugin.json   # plugin manifest
+│       │   └── plugin.json   # 플러그인 매니페스트
 │       ├── commands/
-│       │   ├── ccd.md            # /cc-dash:ccd slash command — widget toggle
-│       │   └── ccd-setup.md      # /cc-dash:ccd-setup — one-shot settings.json wire-up
+│       │   ├── ccd.md            # /cc-dash:ccd 슬래시 커맨드 — 위젯 토글
+│       │   └── ccd-setup.md      # /cc-dash:ccd-setup — settings.json 원샷 배선
 │       └── scripts/
-│           ├── statusline.sh     # the statusLine renderer
-│           ├── cc-dash-config.sh # widget toggle CLI + interactive menu
-│           └── cc-dash-setup.sh  # settings.json patcher (called by /cc-dash:ccd-setup)
+│           ├── statusline.sh     # statusLine 렌더러
+│           ├── cc-dash-config.sh # 위젯 토글 CLI + 대화식 메뉴
+│           └── cc-dash-setup.sh  # settings.json 패처 (/cc-dash:ccd-setup 이 호출)
 ├── LICENSE
-└── README.md
+├── README.md                 # 한국어 (기본)
+└── README.en.md              # English
 ```
 
 ---
 
-## Manual testing
+## 수동 테스트
 
 ```bash
-# Render with a synthetic payload
+# 합성 페이로드로 렌더
 echo '{"model":{"display_name":"Opus 4.7 (1M context)","id":"claude-opus-4-7"},"output_style":{"name":"default"},"context_window_size":200000,"used_percentage":25,"total_input_tokens":50000,"total_duration_ms":120000,"total_api_duration_ms":95000,"total_cost_usd":0.5,"total_lines_added":120,"total_lines_removed":34,"session_id":"abc12345","current_dir":".","permission_mode":"default","version":"2.1.116","rate_limits":{"five_hour":{"used_percentage":7,"resets_at":1745289600},"seven_day":{"used_percentage":26,"resets_at":1745808000}}}' \
   | bash scripts/statusline.sh
 
-# Time it
+# 실행 시간 측정
 time (echo '{…}' | bash scripts/statusline.sh)
 
-# Everything on
+# 전체 위젯 ON
 CC_DASH_SHOW_SESSION=1 CC_DASH_SHOW_BUDGET=1 bash scripts/statusline.sh <<< '{…}'
 ```
 
-Expected output for the default render (no `widgets.conf` yet — clock and git widgets reflect your environment; the `resets_at` timestamps above are in the past, so no `reset` timers appear):
+기본 렌더의 기대 출력(`widgets.conf`가 아직 없는 상태 — clock·git 위젯은 사용자 환경을 반영하며, 위 `resets_at`은 과거 시각이라 `reset` 타이머가 표시되지 않습니다):
 
 ```
 🧠 Opus 4.7 (1M context) │ ⏱  dur 2m0s │ 🪟 ctx 25% (50.0K/200.0K) │ 💬 token 50.0K │ 💸 cost $0.50 │ ✏️  +120/-34
@@ -271,12 +274,12 @@ Expected output for the default render (no `widgets.conf` yet — clock and git 
 🚀 cc v2.1.116 │ 🔀 git — │ 🕐 2026.04.21 14:53
 ```
 
-`API_DUR` (`🌐 api 1m35s`) and `STYLE` (`🎨 style default`) are off by default — `/cc-dash:ccd on API_DUR STYLE` to see them.
+`API_DUR`(`🌐 api 1m35s`)와 `STYLE`(`🎨 style default`)은 기본 OFF입니다 — `/cc-dash:ccd on API_DUR STYLE`로 확인하세요.
 
-Typical wall-clock on Git Bash for Windows is **100–140 ms** (dominated by bash startup and JSON parse; the budget widget is off by default so no JSONL scan). Native bash 5.2 on Linux/macOS is typically faster.
+Windows Git Bash 기준 일반적인 실측 시간은 **100–140ms**입니다(bash 기동과 JSON 파싱이 지배적이며, budget 위젯은 기본 OFF라 JSONL 스캔이 없습니다). Linux/macOS 네이티브 bash 5.2는 대체로 더 빠릅니다.
 
 ---
 
-## License
+## 라이선스
 
 MIT.

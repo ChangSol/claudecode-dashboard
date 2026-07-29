@@ -1,0 +1,285 @@
+# cc-dash
+
+[한국어](README.md) | **English**
+
+**A fork-free, zero-dependency statusLine for Claude Code.**
+17 widgets — model, duration, API duration, context, tokens, cost, lines changed, budget, rate limits (incl. per-model weekly), permission, output style, version, git, project, session, clock — rendered in three rows. Toggle any widget with `/cc-dash:ccd`.
+
+```
+🧠 Opus 4.7 (1M context) │ ⏱  dur 22m0s │ 🪟 ctx 25% │ 💬 token 50.0K │ 💸 cost $0.50 │ ✏️  +120/-34
+⏳ now 0% reset 3h0m │ ⏳ week 2% reset 6d22h
+🚀 cc v2.1.116 │ 🔀 git: main │ 🕐 2026.04.21 13:03
+```
+
+---
+
+## Why
+
+Most statusLine scripts fork `jq`, `awk`, `date`, `git` every second and leave your shell wheezing. cc-dash is **pure bash built-ins on the fast path** (bash ≥ 4.3) — no forks, no `cat`, no `sed`. The one exception is the opt-in budget widget, which uses a single `awk` call with a 60-second cache.
+
+L1 is automatically clipped to terminal width (respects `$COLUMNS`) so L2 and L3 are always visible.
+
+---
+
+## Features
+
+- **17 widgets, all toggle-able** — `/cc-dash:ccd toggle BUDGET`, `/cc-dash:ccd off RATE_7D`, `/cc-dash:ccd reset`.
+- **3-row layout** — usage on row 1, rate limits on row 2, meta + clock on row 3.
+- **Self-labeling** — every icon has a short English tag so nothing is cryptic.
+- **Context %, now (5h) / week (7d) rate limits, token count, session cost** — all parsed from the statusLine JSON payload Claude Code provides.
+- **Threshold colors** — ≥50% amber, ≥80% red. `⏳` flips to `⌛` when quota is hot; 🔥 appears when usage runs ahead of the window's reset pace.
+- **Git branch** + in-progress indicator (`*` for merge/rebase).
+- **Optional budget widget** — scans today's JSONL logs to track daily spend against `$CC_DASH_BUDGET`.
+- **PROJECT and SESSION** as separate toggle-able widgets.
+
+---
+
+## Install
+
+### 1. As a plugin
+
+Claude Code installs plugins via marketplaces, so it's a two-step flow — add the repo as a marketplace first, then install the `cc-dash` plugin from it:
+
+```
+/plugin marketplace add ChangSol/claudecode-dashboard
+/plugin install cc-dash@claudecode-dashboard
+```
+
+The `/cc-dash:ccd` slash command and the `cc-dash-config.sh` / `statusline.sh` scripts ship inside the plugin.
+
+### 2. Wire up the statusLine
+
+```
+/cc-dash:ccd-setup
+```
+
+Claude Code's plugin manifest has no `statusLine` field, so the first-time wiring is a one-shot helper command that writes the correct `statusLine` entry into `~/.claude/settings.json` for you. Re-run it after every plugin upgrade — the installed path carries the version (`.../cc-dash/1.0.0/...`) and changes on each update.
+
+> **macOS note:** the system `/bin/bash` is frozen at 3.2 and cannot run cc-dash (which uses `printf '%(…)T'` and `local -n`, requiring bash ≥ 4.3). Install a current bash with `brew install bash` *before* running `/cc-dash:ccd-setup` — on macOS the setup script always wires an **absolute** bash path into `settings.json` (PATH bash if it is ≥ 4.3, otherwise `/opt/homebrew/bin/bash` on Apple Silicon or `/usr/local/bin/bash` on Intel), so the statusLine keeps working even when Claude Code is launched from the GUI with a minimal PATH. If no compatible bash is found, the statusLine renders a one-line warning instead of staying blank. The `/cc-dash:ccd` widget toggle needs the brew bash too — on bash 3.2 it refuses with a clear message instead of failing cryptically.
+
+If you'd rather edit by hand, add this block to `~/.claude/settings.json` with the current installed path (see `/plugin` for the exact location):
+
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "bash <absolute-path-to>/cc-dash/scripts/statusline.sh"
+  }
+}
+```
+
+On Windows use forward slashes (e.g. `C:/Users/.../plugins/cache/claudecode-dashboard/cc-dash/1.0.0/scripts/statusline.sh`). On macOS replace the leading `bash` with the absolute brew bash path (e.g. `'/opt/homebrew/bin/bash' '<path>/statusline.sh'`) — a plain `bash` resolves to the 3.2 system bash when Claude Code is launched from the GUI.
+
+### 3. Without the plugin (vendored checkout)
+
+```bash
+git clone https://github.com/ChangSol/claudecode-dashboard ~/cc-dash
+```
+
+Then point `statusLine.command` at `~/cc-dash/scripts/statusline.sh` and — if you want the toggle command — copy `commands/ccd.md` to `~/.claude/commands/` and rewrite the script paths to your checkout.
+
+---
+
+## `/cc-dash:ccd` command
+
+Claude Code plugin slash commands require the `<plugin-name>:` namespace prefix, so every invocation is `/cc-dash:ccd …` (the short `/ccd` form isn't routed). If you want the shorter form, create a user-level alias at `~/.claude/commands/ccd.md` — see [the alias note](#shorter-command-aliases-optional) below.
+
+| Usage | What it does |
+|---|---|
+| `/cc-dash:ccd list` *(or `ls`, `status`)* | Show every widget with ON/off |
+| `/cc-dash:ccd toggle CLOCK GIT` | Toggle one or more widgets |
+| `/cc-dash:ccd on BUDGET` | Force on |
+| `/cc-dash:ccd off RATE_5H RATE_7D` | Force off |
+| `/cc-dash:ccd reset` | Back to defaults |
+| `/cc-dash:ccd all-on` / `/cc-dash:ccd all-off` | Bulk |
+| `/cc-dash:ccd help` | Usage |
+
+Widget keys (case-insensitive):
+
+```
+CLOCK  MODEL  DURATION  API_DUR  CTX  TOKEN  COST  LINES  BUDGET
+RATE_5H  RATE_7D  RATE_MODEL  PERM  STYLE  VERSION  GIT  PROJECT  SESSION
+```
+
+State is persisted at `~/.config/cc-dash/widgets.conf` (override with `CC_DASH_CONFIG`). The file is plain `KEY=0/1` — editable by hand.
+
+### Shorter command aliases (optional)
+
+If typing `/cc-dash:ccd` every time is tedious, create user-level aliases in `~/.claude/commands/`:
+
+`~/.claude/commands/ccd.md`:
+
+```markdown
+---
+description: alias for /cc-dash:ccd
+argument-hint: "[list|toggle|on|off|reset|all-on|all-off] [KEY ...]"
+---
+
+/cc-dash:ccd $ARGUMENTS
+```
+
+`~/.claude/commands/ccd-setup.md`:
+
+```markdown
+---
+description: alias for /cc-dash:ccd-setup
+---
+
+/cc-dash:ccd-setup
+```
+
+After saving, `/ccd list` and `/ccd-setup` resolve to the plugin commands. User-level commands are personal, not shipped by the plugin, so anyone who wants the short form opts in once.
+
+---
+
+## Widget reference
+
+| Key | Default | Example | Row |
+|---|---|---|---|
+| `MODEL`    | on  | `🧠 Opus 4.7 (1M context)`      | 1 |
+| `DURATION` | on  | `⏱  dur 22m23s`                 | 1 |
+| `API_DUR`  | **off** | `🌐 api 4m32s`              | 1 |
+| `CTX`      | on  | `🪟 ctx 25% (50.0K/200.0K)`     | 1 |
+| `TOKEN`    | on  | `💬 token 58.3K`                | 1 |
+| `COST`     | on  | `💸 cost $1.66 (~$4.5/h)`       | 1 |
+| `LINES`    | on  | `✏️  +120/-34`                  | 1 |
+| `BUDGET`   | **off** | `💰 budget $4.21/$15 (28%)`| 1 |
+| `RATE_5H`  | on  | `⏳ now 19% reset 3h8m`         | 2 |
+| `RATE_7D`  | on  | `⏳ week 2% reset 6d22h`        | 2 |
+| `RATE_MODEL` | on | `⏳ Opus 22% reset 4d2h`      | 2 |
+| `PERM`     | **off** | `🔒 perm ask`               | 3 |
+| `STYLE`    | **off** | `🎨 style Explanatory`      | 3 |
+| `VERSION`  | on  | `🚀 cc v2.1.116`                | 3 |
+| `GIT`      | on  | `🔀 git: main` / `🔀 git: main*`| 3 |
+| `PROJECT`  | **off** | `📁 proj: cc-dash`          | 3 |
+| `SESSION`  | **off** | `🆔 ab12cd34`               | 3 |
+| `CLOCK`    | on  | `🕐 2026.04.21 13:03`           | 3 (rightmost) |
+
+Context %, `now` (5h), `week` (7d), and budget % share the same threshold colors: green → amber (≥50%) → red (≥80%).
+
+Usage extras (no separate toggles — they ride their parent widget):
+- `CTX` appends `(used/total)` when the payload carries `context_window_size`.
+- `COST` appends an hourly burn-rate estimate (`~$X.X/h`) once the session is 5+ minutes old.
+- `RATE_5H` / `RATE_7D` append 🔥 when your usage % is ≥15 points ahead of the window's elapsed time — you are on pace to exhaust the limit before it resets.
+- `RATE_MODEL` renders one segment per model-scoped weekly window in the payload (`seven_day_opus`, `seven_day_sonnet`, …) with the same colors/timer/🔥 treatment, labeled by model (`Opus 22%`). Hidden automatically when the payload carries none — Claude Code only sends these on plans with per-model weekly limits.
+
+---
+
+## Customization
+
+### Budget widget (opt-in)
+
+`/cc-dash:ccd on BUDGET` enables a daily-spend tracker. It walks today's `~/.claude/projects/**/*.jsonl` and sums token usage × model rates. The result is cached for 60 seconds at `~/.cache/cc-dash-budget`.
+
+> **Note:** The budget widget is designed for pay-per-token plans. If you use a Claude subscription plan, this widget will not reflect actual costs.
+
+Rates are applied **per model**: each JSONL line's `model` field selects the price tier — Opus $5/$25, Fable/Mythos $10/$50, Sonnet $3/$15, Haiku $1/$5 per Mtok (cache write 1.25×, cache read 0.1× of input). Lines without a `model` field fall back to the Opus tier.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `CC_DASH_BUDGET`       | `15`    | Daily budget in USD |
+| `CC_DASH_RATE_INPUT`   | `5000`  | $/Mtok × 1000, input |
+| `CC_DASH_RATE_OUTPUT`  | `25000` | output |
+| `CC_DASH_RATE_CACHE_W` | `6250`  | cache_creation |
+| `CC_DASH_RATE_CACHE_R` | `500`   | cache_read |
+| `CC_DASH_CACHE`        | `~/.cache/cc-dash-budget` | cache file path |
+| `CC_DASH_CONFIG`       | `~/.config/cc-dash/widgets.conf` | widget toggle file |
+
+Setting **any** `CC_DASH_RATE_*` variable switches back to legacy single-rate mode: your rates apply to every line regardless of model (useful for discounted/introductory pricing). Unset variables fall back to the defaults in the table above — set all four for fully custom pricing.
+
+### Terminal width clipping
+
+L1 is clipped to `$COLUMNS` when set, so L2 and L3 are always visible on narrow terminals. To enable auto-detection, add to `~/.bashrc`:
+
+```bash
+export COLUMNS
+```
+
+### Legacy env-var toggles
+
+The old opt-in env vars still work and override config-file state:
+- `CC_DASH_SHOW_SESSION=1` → `PROJECT` + `SESSION` on
+- `CC_DASH_SHOW_BUDGET=1`  → `BUDGET` on
+
+---
+
+## Performance notes
+
+- **Fast path: zero forks.** No `jq`, `awk`, `sed`, `cat`, or `date` on normal renders — only bash built-ins (`printf -v '%(…)T'`, `[[`, `read`).
+- **Budget widget**: one `find -newermt` + one `awk` only when cache is cold (~1 s). Cache hits are a single `read` from the cache file (~5 ms).
+- **Trailing-whitespace trick**: every space is replaced with NBSP (` `) before output, so terminals don't trim and the Claude Code dim attribute doesn't bleed into the line (`\x1b[0m` prefix).
+
+---
+
+## Compatibility
+
+- **Shell**: bash ≥ 4.3 (needs `printf -v '%(…)T'` from 4.2 and `local -n` namerefs from 4.3). macOS `/bin/bash` is 3.2 and is **not** supported — `brew install bash` and let `/cc-dash:ccd-setup` wire the absolute path. Works under Git Bash on Windows.
+- **Claude Code**: uses the `statusLine` hook JSON payload (model, cost, rate limits, session fields). Any Claude Code build that emits those fields is supported.
+- **Platforms**: Linux, macOS (with brew bash), Windows (Git Bash / WSL).
+
+---
+
+## Limitations
+
+- **Git dirty is a heuristic.** The script checks for `MERGE_HEAD` / `ORIG_HEAD` / `rebase-merge` to decide whether to append `*`. A real `git status` would require a fork.
+- **Budget rates are manual.** JSONL logs don't store a `cost_usd` field directly; cc-dash multiplies token counts by per-model rates. Keep the env vars in sync with Anthropic's pricing.
+- **statusLine is not plugin-declared.** Claude Code's plugin schema currently exposes no `statusLine` field, so users have to add a two-line entry to their own `settings.json` after installing the plugin.
+- **JSONL schema drift.** If Claude Code renames usage fields in the transcript, the `awk` regexes in the budget widget need to be updated.
+
+---
+
+## Project layout
+
+```
+claudecode-dashboard/         # repo root (= marketplace)
+├── .claude-plugin/
+│   └── marketplace.json      # marketplace manifest (lists plugins)
+├── plugins/
+│   └── cc-dash/              # the cc-dash plugin
+│       ├── .claude-plugin/
+│       │   └── plugin.json   # plugin manifest
+│       ├── commands/
+│       │   ├── ccd.md            # /cc-dash:ccd slash command — widget toggle
+│       │   └── ccd-setup.md      # /cc-dash:ccd-setup — one-shot settings.json wire-up
+│       └── scripts/
+│           ├── statusline.sh     # the statusLine renderer
+│           ├── cc-dash-config.sh # widget toggle CLI + interactive menu
+│           └── cc-dash-setup.sh  # settings.json patcher (called by /cc-dash:ccd-setup)
+├── LICENSE
+├── README.md                 # Korean (default)
+└── README.en.md              # this file
+```
+
+---
+
+## Manual testing
+
+```bash
+# Render with a synthetic payload
+echo '{"model":{"display_name":"Opus 4.7 (1M context)","id":"claude-opus-4-7"},"output_style":{"name":"default"},"context_window_size":200000,"used_percentage":25,"total_input_tokens":50000,"total_duration_ms":120000,"total_api_duration_ms":95000,"total_cost_usd":0.5,"total_lines_added":120,"total_lines_removed":34,"session_id":"abc12345","current_dir":".","permission_mode":"default","version":"2.1.116","rate_limits":{"five_hour":{"used_percentage":7,"resets_at":1745289600},"seven_day":{"used_percentage":26,"resets_at":1745808000}}}' \
+  | bash scripts/statusline.sh
+
+# Time it
+time (echo '{…}' | bash scripts/statusline.sh)
+
+# Everything on
+CC_DASH_SHOW_SESSION=1 CC_DASH_SHOW_BUDGET=1 bash scripts/statusline.sh <<< '{…}'
+```
+
+Expected output for the default render (no `widgets.conf` yet — clock and git widgets reflect your environment; the `resets_at` timestamps above are in the past, so no `reset` timers appear):
+
+```
+🧠 Opus 4.7 (1M context) │ ⏱  dur 2m0s │ 🪟 ctx 25% (50.0K/200.0K) │ 💬 token 50.0K │ 💸 cost $0.50 │ ✏️  +120/-34
+⏳ now 7% │ ⏳ week 26%
+🚀 cc v2.1.116 │ 🔀 git — │ 🕐 2026.04.21 14:53
+```
+
+`API_DUR` (`🌐 api 1m35s`) and `STYLE` (`🎨 style default`) are off by default — `/cc-dash:ccd on API_DUR STYLE` to see them.
+
+Typical wall-clock on Git Bash for Windows is **100–140 ms** (dominated by bash startup and JSON parse; the budget widget is off by default so no JSONL scan). Native bash 5.2 on Linux/macOS is typically faster.
+
+---
+
+## License
+
+MIT.
