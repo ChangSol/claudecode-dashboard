@@ -13,7 +13,7 @@
 
 ## Why
 
-Most statusLine scripts fork `jq`, `awk`, `date`, `git` every second and leave your shell wheezing. cc-dash is **pure bash 5.2 built-ins on the fast path** — no forks, no `cat`, no `sed`. The one exception is the opt-in budget widget, which uses a single `awk` call with a 60-second cache.
+Most statusLine scripts fork `jq`, `awk`, `date`, `git` every second and leave your shell wheezing. cc-dash is **pure bash built-ins on the fast path** (bash ≥ 4.3) — no forks, no `cat`, no `sed`. The one exception is the opt-in budget widget, which uses a single `awk` call with a 60-second cache.
 
 L1 is automatically clipped to terminal width (respects `$COLUMNS`) so L2 and L3 are always visible.
 
@@ -53,7 +53,7 @@ The `/cc-dash:ccd` slash command and the `cc-dash-config.sh` / `statusline.sh` s
 
 Claude Code's plugin manifest has no `statusLine` field, so the first-time wiring is a one-shot helper command that writes the correct `statusLine` entry into `~/.claude/settings.json` for you. Re-run it after every plugin upgrade — the installed path carries the version (`.../cc-dash/1.0.0/...`) and changes on each update.
 
-> **macOS note:** the system `/bin/bash` is frozen at 3.2 and cannot run cc-dash (which uses `printf '%(…)T'` and `local -n`, requiring bash ≥ 4.3). Install a current bash with `brew install bash` *before* running `/cc-dash:ccd-setup` — the setup script auto-detects `/opt/homebrew/bin/bash` (Apple Silicon) or `/usr/local/bin/bash` (Intel) and wires the absolute path into `settings.json`. If no compatible bash is found, the statusLine renders a one-line warning instead of staying blank.
+> **macOS note:** the system `/bin/bash` is frozen at 3.2 and cannot run cc-dash (which uses `printf '%(…)T'` and `local -n`, requiring bash ≥ 4.3). Install a current bash with `brew install bash` *before* running `/cc-dash:ccd-setup` — on macOS the setup script always wires an **absolute** bash path into `settings.json` (PATH bash if it is ≥ 4.3, otherwise `/opt/homebrew/bin/bash` on Apple Silicon or `/usr/local/bin/bash` on Intel), so the statusLine keeps working even when Claude Code is launched from the GUI with a minimal PATH. If no compatible bash is found, the statusLine renders a one-line warning instead of staying blank. The `/cc-dash:ccd` widget toggle needs the brew bash too — on bash 3.2 it refuses with a clear message instead of failing cryptically.
 
 If you'd rather edit by hand, add this block to `~/.claude/settings.json` with the current installed path (see `/plugin` for the exact location):
 
@@ -66,7 +66,7 @@ If you'd rather edit by hand, add this block to `~/.claude/settings.json` with t
 }
 ```
 
-On Windows use forward slashes (e.g. `C:/Users/.../plugins/cache/claudecode-dashboard/cc-dash/1.0.0/scripts/statusline.sh`).
+On Windows use forward slashes (e.g. `C:/Users/.../plugins/cache/claudecode-dashboard/cc-dash/1.0.0/scripts/statusline.sh`). On macOS replace the leading `bash` with the absolute brew bash path (e.g. `'/opt/homebrew/bin/bash' '<path>/statusline.sh'`) — a plain `bash` resolves to the 3.2 system bash when Claude Code is launched from the GUI.
 
 ### 3. Without the plugin (vendored checkout)
 

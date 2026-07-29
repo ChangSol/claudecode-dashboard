@@ -38,25 +38,31 @@ fi
 # 4.3). macOS ships /bin/bash 3.2 frozen at GPLv2; if that's all PATH gives us,
 # fall back to a Homebrew-installed bash so Claude Code spawns the right one.
 pick_bash() {
-  local cand ver maj min
+  # Ask each candidate to judge its own BASH_VERSINFO — no version-string
+  # parsing, so odd formats like "4.4(1)-release" (no patch level) still work.
+  local cand
   for cand in "$@"; do
     [[ -n "$cand" && -x "$cand" ]] || continue
-    ver=$("$cand" -c 'printf %s "$BASH_VERSION"' 2>/dev/null) || continue
-    maj="${ver%%.*}"
-    min="${ver#*.}"; min="${min%%.*}"
-    [[ "$maj" =~ ^[0-9]+$ && "$min" =~ ^[0-9]+$ ]] || continue
-    if (( maj > 4 || (maj == 4 && min >= 3) )); then
-      printf '%s' "$cand"
-      return 0
-    fi
+    # Leading [ -n ... ] short-circuit keeps non-bash shells (dash/busybox
+    # symlinked as bash) from executing the (( )) — they'd misparse `> 4` as a
+    # redirect and drop a stray file named "4" in the cwd.
+    "$cand" -c '[ -n "${BASH_VERSION:-}" ] && (( BASH_VERSINFO[0] > 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] >= 3) ))' 2>/dev/null || continue
+    printf '%s' "$cand"
+    return 0
   done
   return 1
 }
 
 PATH_BASH="$(command -v bash 2>/dev/null || true)"
 BASH_BIN_FOR_CMD=""
-if pick_bash "$PATH_BASH" >/dev/null; then
-  : # PATH bash is new enough — leave the wired command as plain `bash`
+if PICKED_BASH="$(pick_bash "$PATH_BASH")"; then
+  # PATH bash is new enough. On macOS wire its absolute path anyway: a
+  # GUI-launched Claude Code gets a minimal PATH (no /opt/homebrew/bin), so a
+  # plain `bash` command could resolve back to /bin/bash 3.2 at render time.
+  if [[ "$(uname -s 2>/dev/null)" == "Darwin" ]]; then
+    BASH_BIN_FOR_CMD="$PICKED_BASH"
+    echo "info: macOS — wiring absolute bash path $PICKED_BASH for statusLine."
+  fi
 else
   BREW_BASH="$(pick_bash /opt/homebrew/bin/bash /usr/local/bin/bash || true)"
   if [[ -n "$BREW_BASH" ]]; then

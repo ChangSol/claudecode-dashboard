@@ -1,6 +1,15 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # cc-dash 위젯 ON/OFF 대화식 설정 — statusline.sh는 이 파일을 source 해서 각 위젯 노출을 결정한다.
 # 저장 경로: $CC_DASH_CONFIG (기본 ~/.config/cc-dash/widgets.conf)
+# 셔뱅이 env bash 인 이유: macOS /bin/bash 는 3.2 — PATH 의 brew bash 를 잡기 위함.
+
+# Self-guard: `declare -A`/`${var^^}` 는 bash 4+ 전용 — 플러그인 전체 최저선(4.3)으로 통일.
+# macOS /bin/bash 3.2 로 실행되면 `declare: -A: invalid option` 류 오류가 나므로 명확히 안내.
+if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 3) )); then
+  printf 'cc-dash: bash %s is too old (need 4.3+).\n' "$BASH_VERSION" >&2
+  printf 'macOS: brew install bash, then retry. (system /bin/bash 3.2 cannot run cc-dash)\n' >&2
+  exit 1
+fi
 
 CFG_FILE="${CC_DASH_CONFIG:-$HOME/.config/cc-dash/widgets.conf}"
 
