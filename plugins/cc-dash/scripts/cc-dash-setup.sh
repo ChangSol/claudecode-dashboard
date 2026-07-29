@@ -34,9 +34,44 @@ if [[ ! -f "$SETTINGS" ]]; then
   printf '{}\n' > "$SETTINGS"
 fi
 
-node - "$SETTINGS" "$STATUSLINE" <<'JS'
+# statusline.sh needs bash 4.3+ (printf '%(...)T' is 4.2, `local -n` nameref is
+# 4.3). macOS ships /bin/bash 3.2 frozen at GPLv2; if that's all PATH gives us,
+# fall back to a Homebrew-installed bash so Claude Code spawns the right one.
+pick_bash() {
+  local cand ver maj min
+  for cand in "$@"; do
+    [[ -n "$cand" && -x "$cand" ]] || continue
+    ver=$("$cand" -c 'printf %s "$BASH_VERSION"' 2>/dev/null) || continue
+    maj="${ver%%.*}"
+    min="${ver#*.}"; min="${min%%.*}"
+    [[ "$maj" =~ ^[0-9]+$ && "$min" =~ ^[0-9]+$ ]] || continue
+    if (( maj > 4 || (maj == 4 && min >= 3) )); then
+      printf '%s' "$cand"
+      return 0
+    fi
+  done
+  return 1
+}
+
+PATH_BASH="$(command -v bash 2>/dev/null || true)"
+BASH_BIN_FOR_CMD=""
+if pick_bash "$PATH_BASH" >/dev/null; then
+  : # PATH bash is new enough — leave the wired command as plain `bash`
+else
+  BREW_BASH="$(pick_bash /opt/homebrew/bin/bash /usr/local/bin/bash || true)"
+  if [[ -n "$BREW_BASH" ]]; then
+    BASH_BIN_FOR_CMD="$BREW_BASH"
+    echo "info: PATH bash (${PATH_BASH:-not found}) is too old; using $BREW_BASH for statusLine."
+  else
+    echo "warning: no bash 4.3+ found on PATH or in /opt/homebrew/bin /usr/local/bin." >&2
+    echo "         macOS users: brew install bash, then re-run /cc-dash:ccd-setup." >&2
+    echo "         The statusLine will render a one-line bash-too-old warning until you do." >&2
+  fi
+fi
+
+node - "$SETTINGS" "$STATUSLINE" "$BASH_BIN_FOR_CMD" <<'JS'
 const fs = require('fs');
-const [, , path, sl] = process.argv;
+const [, , path, sl, bashOverride] = process.argv;
 let raw;
 try { raw = fs.readFileSync(path, 'utf8'); }
 catch (e) { console.error('error reading ' + path + ': ' + e.message); process.exit(1); }
@@ -45,7 +80,8 @@ try { cfg = raw.trim() ? JSON.parse(raw) : {}; }
 catch (e) { console.error('error: ' + path + ' is not valid JSON — aborting to avoid data loss. (' + e.message + ')'); process.exit(1); }
 
 // 1. statusLine
-const cmd = "bash '" + sl + "'";
+const bashRef = bashOverride ? "'" + bashOverride + "'" : "bash";
+const cmd = bashRef + " '" + sl + "'";
 const prev = cfg.statusLine && cfg.statusLine.command;
 cfg.statusLine = { type: 'command', command: cmd };
 

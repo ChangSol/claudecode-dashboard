@@ -3,6 +3,16 @@
 # 원본 7개 위젯(model/duration/ctx/token/cost/5h/7d) + 확장 4개(git/project/ctx-bar/budget)
 # 트릭: NBSP 공백(trim 방지), \x1b[0m 접두(Claude dim 무효화), JSON은 bash 정규식으로 파싱(jq fork 없음)
 
+# Self-guard: needs bash 4.3+ (printf '%(...)T' is 4.2, `local -n` nameref is 4.3).
+# macOS /bin/bash is frozen at 3.2; without this check the script would emit
+# `invalid format character` / `local: -n: invalid option` and produce an empty
+# statusLine. Render a single visible warning line instead so the cause is obvious.
+if (( BASH_VERSINFO[0] < 4 || (BASH_VERSINFO[0] == 4 && BASH_VERSINFO[1] < 3) )); then
+  printf '\x1b[0m\xe2\x9a\xa0\xef\xb8\x8f  cc-dash: bash %s too old (need 4.3+) \xe2\x80\x94 macOS: brew install bash, then /cc-dash:ccd-setup\n' "$BASH_VERSION" >&2
+  printf '\x1b[0m\xe2\x9a\xa0\xef\xb8\x8f  cc-dash: bash %s too old (need 4.3+) \xe2\x80\x94 macOS: brew install bash, then /cc-dash:ccd-setup\n' "$BASH_VERSION"
+  exit 0
+fi
+
 # ---------- 0. 위젯 on/off 설정 로드 (fork-free) ----------
 # cc-dash-config.sh 로 편집. 환경변수 CC_DASH_SHOW_SESSION/BUDGET 은 역호환성 유지.
 CFG_CLOCK=1 CFG_MODEL=1 CFG_DURATION=1 CFG_CTX=1 CFG_TOKEN=1 CFG_COST=1

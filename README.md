@@ -53,6 +53,8 @@ The `/cc-dash:ccd` slash command and the `cc-dash-config.sh` / `statusline.sh` s
 
 Claude Code's plugin manifest has no `statusLine` field, so the first-time wiring is a one-shot helper command that writes the correct `statusLine` entry into `~/.claude/settings.json` for you. Re-run it after every plugin upgrade — the installed path carries the version (`.../cc-dash/1.0.0/...`) and changes on each update.
 
+> **macOS note:** the system `/bin/bash` is frozen at 3.2 and cannot run cc-dash (which uses `printf '%(…)T'` and `local -n`, requiring bash ≥ 4.3). Install a current bash with `brew install bash` *before* running `/cc-dash:ccd-setup` — the setup script auto-detects `/opt/homebrew/bin/bash` (Apple Silicon) or `/usr/local/bin/bash` (Intel) and wires the absolute path into `settings.json`. If no compatible bash is found, the statusLine renders a one-line warning instead of staying blank.
+
 If you'd rather edit by hand, add this block to `~/.claude/settings.json` with the current installed path (see `/plugin` for the exact location):
 
 ```json
@@ -201,9 +203,9 @@ The old opt-in env vars still work and override config-file state:
 
 ## Compatibility
 
-- **Shell**: bash ≥ 5.2 (needs `printf -v '%(%s)T'` and `${var//…/…}` semantics). Works under Git Bash on Windows.
+- **Shell**: bash ≥ 4.3 (needs `printf -v '%(…)T'` from 4.2 and `local -n` namerefs from 4.3). macOS `/bin/bash` is 3.2 and is **not** supported — `brew install bash` and let `/cc-dash:ccd-setup` wire the absolute path. Works under Git Bash on Windows.
 - **Claude Code**: uses the `statusLine` hook JSON payload (model, cost, rate limits, session fields). Any Claude Code build that emits those fields is supported.
-- **Platforms**: Linux, macOS, Windows (Git Bash / WSL).
+- **Platforms**: Linux, macOS (with brew bash), Windows (Git Bash / WSL).
 
 ---
 
