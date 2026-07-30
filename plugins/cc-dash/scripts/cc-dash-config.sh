@@ -25,7 +25,8 @@ WIDGETS=(
   "BUDGET:💰 일일 예산 % (opt-in, JSONL 스캔)"
   "RATE_5H:⏳ now(5h) 리밋 + 타이머 (🔥 페이스 경고)"
   "RATE_7D:⏳ week(7d) 리밋 + 타이머 (🔥 페이스 경고)"
-  "RATE_MODEL:⏳ 모델별 주간 리밋 (Opus 등 — 페이로드 제공 시)"
+  "RATE_MODEL:⏳ 모델별 주간 리밋 (Fable·Opus 등)"
+  "RATE_API:🌐 모델별 리밋 API 조회 (opt-in — OAuth 토큰 사용)"
   "PERM:🔒 권한 모드"
   "STYLE:🎨 output style (opt-in)"
   "VERSION:🚀 Claude Code 버전"
@@ -35,7 +36,7 @@ WIDGETS=(
 )
 
 DEFAULT_KEYS=(CLOCK MODEL DURATION CTX TOKEN COST LINES RATE_5H RATE_7D RATE_MODEL VERSION GIT)
-DEFAULT_OFF=(BUDGET PERM PROJECT SESSION API_DUR STYLE)
+DEFAULT_OFF=(BUDGET PERM PROJECT SESSION API_DUR STYLE RATE_API)
 
 declare -A STATE
 reset_defaults() {
@@ -72,7 +73,7 @@ print_status() {
     else
       if [[ "$v" == "1" ]]; then mark="ON "; else mark="off"; fi
     fi
-    printf '  %-10s %s  %s\n' "$key" "$mark" "$label"
+    printf '  %-12s %s  %s\n' "$key" "$mark" "$label"
   done
 }
 
@@ -124,6 +125,25 @@ if [[ $# -gt 0 ]]; then
       else
         printf 'budget 캐시 없음 — 다음 렌더에서 새로 계산: %s\n' "$cache_file"
       fi
+      # ①-b RATE_API 가 켜져 있으면 모델별 리밋을 지금 동기로 다시 받아둔다.
+      # (꺼져 있으면 네트워크·토큰 접근 없음 — 캐시/마커만 정리한다.)
+      usage_cache="${CC_DASH_USAGE_CACHE:-$HOME/.cache/cc-dash-usage}"
+      [[ -f "${usage_cache}.attempt" ]] && rm "${usage_cache}.attempt" 2>/dev/null
+      if [[ "${STATE[RATE_API]}" == "1" ]]; then
+        fetch_sh="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/cc-dash-usage-fetch.sh"
+        if [[ -f "$fetch_sh" ]]; then
+          if bash "$fetch_sh" -v; then
+            printf 'usage 캐시 갱신: %s\n' "$usage_cache"
+          else
+            printf 'warning: usage 조회 실패 — 위 진단 참고 (세그먼트는 조용히 숨겨짐)\n' >&2
+          fi
+        else
+          printf 'warning: cc-dash-usage-fetch.sh 없음 (%s) — usage 갱신 생략\n' "$fetch_sh" >&2
+        fi
+      else
+        [[ -f "$usage_cache" ]] && rm "$usage_cache" 2>/dev/null
+        printf 'usage 조회 off (RATE_API) — 켜려면: cc-dash-config.sh on RATE_API\n'
+      fi
       # ② statusLine 재배선 — 플러그인 업그레이드 시 settings.json 이 구버전
       # 경로를 가리킨 채로 남는다. setup 은 멱등이라 최신이면 그대로 통과한다.
       setup_sh="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/cc-dash-setup.sh"
@@ -145,10 +165,17 @@ cc-dash 위젯 ON/OFF
   cc-dash-config.sh off KEY [KEY …]    끄기
   cc-dash-config.sh reset              기본값 복원
   cc-dash-config.sh all-on | all-off   전체 ON/OFF
-  cc-dash-config.sh refresh            budget 캐시 비우기 + statusLine 경로 재배선
+  cc-dash-config.sh refresh            budget 캐시 비우기 + usage 재조회(RATE_API 시)
+                                       + statusLine 경로 재배선
 
 KEY (대소문자 무관): CLOCK MODEL DURATION API_DUR CTX TOKEN COST LINES BUDGET
-                    RATE_5H RATE_7D RATE_MODEL PERM STYLE VERSION GIT PROJECT SESSION
+                    RATE_5H RATE_7D RATE_MODEL RATE_API PERM STYLE VERSION GIT
+                    PROJECT SESSION
+
+RATE_API 는 모델별 주간 리밋(Fable 등)을 Anthropic /api/oauth/usage 에서 받아오는
+opt-in 스위치다 — Claude Code 의 statusLine 페이로드에 그 값이 없어서 필요하다.
+켜면 백그라운드에서 OAuth 액세스 토큰(~/.claude/.credentials.json)을 읽어 5분 TTL
+캐시를 갱신한다. 끄면 네트워크·토큰 접근이 전혀 없다.
 EOF
       exit 0;;
     *) printf '알 수 없는 명령: %s ("help" 참고)\n' "$cmd" >&2; exit 2;;

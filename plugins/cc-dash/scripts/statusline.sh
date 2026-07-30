@@ -18,7 +18,7 @@ fi
 CFG_CLOCK=1 CFG_MODEL=1 CFG_DURATION=1 CFG_CTX=1 CFG_TOKEN=1 CFG_COST=1
 CFG_BUDGET=0 CFG_RATE_5H=1 CFG_RATE_7D=1
 CFG_PERM=0 CFG_VERSION=1 CFG_GIT=1 CFG_PROJECT=0 CFG_SESSION=0
-CFG_LINES=1 CFG_API_DUR=0 CFG_STYLE=0 CFG_RATE_MODEL=1
+CFG_LINES=1 CFG_API_DUR=0 CFG_STYLE=0 CFG_RATE_MODEL=1 CFG_RATE_API=0
 _CC_DASH_CFG="${CC_DASH_CONFIG:-$HOME/.config/cc-dash/widgets.conf}"
 if [[ -f "$_CC_DASH_CFG" ]]; then
   while IFS='=' read -r _k _v; do
@@ -380,11 +380,48 @@ append() {
 
 [[ "$CFG_RATE_5H"  == "1" ]] && append L2 "${RATE_5H_ICON} now ${RATE_5H_COLOR}${RATE_5H}%${RST}${PACE_5H}${TIMER_5H}"
 [[ "$CFG_RATE_7D"  == "1" ]] && append L2 "${RATE_7D_ICON} week ${RATE_7D_COLOR}${RATE_7D}%${RST}${PACE_7D}${TIMER_7D}"
-# 모델별 주간 윈도 — 페이로드에 seven_day_* 블록이 있을 때만 노출 (제네릭 라벨)
+# 모델별 주간 윈도 — ① 페이로드의 seven_day_* 우선, ② 없으면 RATE_API 캐시(opt-in)
+# 현행 Claude Code 는 statusLine 페이로드에 five_hour·seven_day 만 넣으므로 ①은
+# 사실상 비어 있다. ②는 cc-dash-usage-fetch.sh 가 /api/oauth/usage 에서 받아둔
+# 캐시를 읽는다 — OAuth 토큰을 쓰는 경로라 RATE_API 를 켠 사용자에게만 동작한다.
+if [[ "$CFG_RATE_MODEL" == "1" && "$CFG_RATE_API" == "1" && ${#RATE_MD_KEYS[@]} -eq 0 ]]; then
+  _uc="${CC_DASH_USAGE_CACHE:-$HOME/.cache/cc-dash-usage}"
+  _uc_fetched=""
+  if [[ -f "$_uc" ]]; then
+    while IFS='|' read -r _f1 _f2 _f3 _f4; do
+      case "$_f1" in
+        T) _uc_fetched="$_f2";;
+        M) [[ -n "$_f2" ]] || continue
+           RATE_MD_KEYS+=("$_f2"); RATE_MD_PCTS+=("$_f3"); RATE_MD_RESETS+=("${_f4:-0}");;
+      esac
+    done < "$_uc"
+  fi
+  # 캐시가 없거나 TTL 초과면 백그라운드로 1회 갱신 — 이번 렌더는 stale 값을 그대로
+  # 쓴다(플리커 방지). 렌더는 턴마다 여러 번 일어나므로 시도 시각을 마커 파일에
+  # 적어 최소 간격을 강제한다 (mtime 조회는 fork 가 필요해 파일 내용으로 대체).
+  if [[ ! "$_uc_fetched" =~ ^[0-9]+$ ]] || (( NOW_EPOCH - _uc_fetched > ${CC_DASH_USAGE_TTL:-300} )); then
+    _uc_mark="${_uc}.attempt" _uc_last=0
+    if [[ -f "$_uc_mark" ]]; then
+      while IFS= read -r _l; do _uc_last="$_l"; break; done < "$_uc_mark"
+      [[ "$_uc_last" =~ ^[0-9]+$ ]] || _uc_last=0
+    fi
+    if (( NOW_EPOCH - _uc_last > ${CC_DASH_USAGE_MIN_INTERVAL:-60} )); then
+      _uc_fetcher="${BASH_SOURCE[0]%/*}/cc-dash-usage-fetch.sh"
+      if [[ -f "$_uc_fetcher" ]]; then
+        mkdir -p "${_uc%/*}" 2>/dev/null
+        printf '%s\n' "$NOW_EPOCH" > "$_uc_mark" 2>/dev/null
+        # 자식의 stdout/stderr 를 명시적으로 끊는다 — statusLine 파이프에 매달리면
+        # Claude Code 가 렌더를 끝내지 못한다.
+        bash "$_uc_fetcher" >/dev/null 2>&1 </dev/null &
+      fi
+    fi
+  fi
+fi
 if [[ "$CFG_RATE_MODEL" == "1" ]]; then
   for _i in "${!RATE_MD_KEYS[@]}"; do
     _mp="${RATE_MD_PCTS[_i]}"; _mr="${RATE_MD_RESETS[_i]}"
-    [[ -z "$_mp" || "$_mp" == "null" ]] && _mp=0
+    [[ "$_mp" =~ ^[0-9]+$ ]] || _mp=0
+    [[ "$_mr" =~ ^[0-9]+$ ]] || _mr=0
     case "${RATE_MD_KEYS[_i]}" in
       opus)   _ml="Opus";;
       sonnet) _ml="Sonnet";;
