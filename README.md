@@ -3,7 +3,7 @@
 **한국어** | [English](README.en.md)
 
 **fork 없는 무의존성 Claude Code statusLine.**
-18개 위젯 — 모델, 경과 시간, API 시간, 컨텍스트, 토큰, 비용, 변경 라인, 예산, 리밋(모델별 주간 포함), 권한, output style, 버전, git, 프로젝트, 세션, 시각 — 을 3행으로 렌더링합니다. `/cc-dash:ccd`로 위젯별 ON/OFF.
+19개 위젯 — 모델, 경과 시간, API 시간, 컨텍스트, 토큰, 비용, 변경 라인, 예산, 리밋(모델별 주간 포함), 권한, output style, 버전, git, 프로젝트, 세션, 시각 — 을 3행으로 렌더링합니다. `/cc-dash:ccd`로 위젯별 ON/OFF.
 
 ```
 🧠 Opus 4.7 (1M context) │ ⏱  dur 22m0s │ 🪟 ctx 25% │ 💬 token 50.0K │ 💸 cost $0.50 │ ✏️  +120/-34
@@ -15,7 +15,7 @@
 
 ## 왜 cc-dash인가
 
-대부분의 statusLine 스크립트는 매초 `jq`, `awk`, `date`, `git`을 fork해 셸을 무겁게 만듭니다. cc-dash는 **fast path가 순수 bash 내장 명령**(bash ≥ 4.3)입니다 — fork 없음, `cat` 없음, `sed` 없음. 유일한 예외는 opt-in budget 위젯으로, 60초 캐시와 함께 `awk`를 1회만 호출합니다.
+대부분의 statusLine 스크립트는 매초 `jq`, `awk`, `date`, `git`을 fork해 셸을 무겁게 만듭니다. cc-dash는 **fast path가 순수 bash 내장 명령**(bash ≥ 4.3)입니다 — fork 없음, `cat` 없음, `sed` 없음. 예외는 opt-in 위젯 둘뿐입니다: budget은 60초 캐시와 함께 `awk`를 1회 호출하고, `RATE_API`는 5분 캐시가 식을 때만 백그라운드 조회를 1회 띄웁니다.
 
 1행은 터미널 폭(`$COLUMNS`)에 맞춰 자동으로 잘리므로 2·3행은 항상 보입니다.
 
@@ -23,7 +23,7 @@
 
 ## 주요 기능
 
-- **18개 위젯 전부 토글 가능** — `/cc-dash:ccd toggle BUDGET`, `/cc-dash:ccd off RATE_7D`, `/cc-dash:ccd reset`.
+- **19개 위젯 전부 토글 가능** — `/cc-dash:ccd toggle BUDGET`, `/cc-dash:ccd off RATE_7D`, `/cc-dash:ccd reset`.
 - **3행 레이아웃** — 1행 사용량, 2행 리밋, 3행 메타 + 시계.
 - **셀프 라벨링** — 모든 아이콘에 짧은 영문 태그가 붙어 있어 의미가 헷갈리지 않습니다.
 - **컨텍스트 %, now(5h)/week(7d) 리밋, 토큰 수, 세션 비용** — 전부 Claude Code가 제공하는 statusLine JSON 페이로드에서 파싱합니다.
@@ -99,7 +99,7 @@ Claude Code 플러그인 슬래시 커맨드는 `<plugin-name>:` 네임스페이
 
 ```
 CLOCK  MODEL  DURATION  API_DUR  CTX  TOKEN  COST  LINES  BUDGET
-RATE_5H  RATE_7D  RATE_MODEL  PERM  STYLE  VERSION  GIT  PROJECT  SESSION
+RATE_5H  RATE_7D  RATE_MODEL  RATE_API  PERM  STYLE  VERSION  GIT  PROJECT  SESSION
 ```
 
 상태는 `~/.config/cc-dash/widgets.conf`에 저장됩니다(`CC_DASH_CONFIG`로 재정의 가능). 파일은 순수 `KEY=0/1` 형식이라 직접 편집해도 됩니다.
@@ -147,7 +147,8 @@ description: alias for /cc-dash:ccd-setup
 | `BUDGET`   | **off** | 오늘 지출 대비 일일 예산 — JSONL 스캔, 종량제 플랜용 | `💰 budget $4.21/$15 (28%)`| 1 |
 | `RATE_5H`  | on  | 5시간 리밋 사용률 + 리셋 타이머 (🔥 페이스 경고) | `⏳ now 19% reset 3h8m`         | 2 |
 | `RATE_7D`  | on  | 주간(7일) 리밋 사용률 + 리셋 타이머 (🔥 페이스 경고) | `⏳ week 2% reset 6d22h`        | 2 |
-| `RATE_MODEL` | on | 모델별 주간 리밋 — 페이로드에 없으면 자동 숨김 | `⏳ Opus 22% reset 4d2h`      | 2 |
+| `RATE_MODEL` | on | 모델별 주간 리밋 — 데이터가 없으면 자동 숨김 | `⏳ Fable 26% reset 4d2h`      | 2 |
+| `RATE_API` | **off** | `RATE_MODEL`의 데이터 출처를 API 조회로 확보 (opt-in, OAuth 토큰 사용) | — | 2 |
 | `PERM`     | **off** | 현재 권한 모드 (ask·plan·accept·auto·bypass) | `🔒 perm ask`               | 3 |
 | `STYLE`    | **off** | 활성 output style 이름 | `🎨 style Explanatory`      | 3 |
 | `VERSION`  | on  | 실행 중인 Claude Code 버전 | `🚀 cc v2.1.116`                | 3 |
@@ -162,7 +163,7 @@ description: alias for /cc-dash:ccd-setup
 - `CTX`는 페이로드에 `context_window_size`가 오면 `(사용/전체)`를 병기합니다.
 - `COST`는 세션이 5분을 넘으면 시간당 소진율 추정치(`~$X.X/h`)를 병기합니다.
 - `RATE_5H` / `RATE_7D`는 사용률이 윈도 경과율보다 15%p 이상 앞서면 🔥를 붙입니다 — 리셋 전에 리밋을 소진할 페이스라는 뜻입니다.
-- `RATE_MODEL`은 페이로드의 모델별 주간 윈도(`seven_day_opus`, `seven_day_sonnet`, …)마다 세그먼트 하나를 렌더링합니다 — 색상/타이머/🔥 처리는 동일하고 모델명으로 라벨링됩니다(`Opus 22%`). 페이로드에 없으면 자동 숨김 — Claude Code는 모델별 주간 리밋이 있는 플랜에서만 이 필드를 보냅니다.
+- `RATE_MODEL`은 모델별 주간 윈도마다 세그먼트 하나를 렌더링합니다 — 색상/타이머/🔥 처리는 `RATE_7D`와 동일하고 모델명으로 라벨링됩니다(`Fable 26%`). 데이터가 없으면 자동 숨김입니다. **현재 Claude Code(2.1.220 확인)의 statusLine 페이로드 `rate_limits`에는 `five_hour`·`seven_day` 둘만 들어오므로**, 모델별 값을 보려면 아래 `RATE_API`를 켜야 합니다. 향후 페이로드에 `seven_day_opus` 류 필드가 추가되면 그 값을 우선 사용합니다(네트워크 조회 없음).
 
 ---
 
@@ -188,6 +189,28 @@ description: alias for /cc-dash:ccd-setup
 
 `CC_DASH_RATE_*` 변수를 **하나라도** 설정하면 레거시 단일 단가 모드로 전환됩니다: 모델과 무관하게 모든 라인에 해당 단가가 적용됩니다(할인/인트로 가격에 유용). 설정하지 않은 변수는 위 표의 기본값으로 폴백하므로, 완전한 커스텀 가격을 원하면 4개를 모두 설정하세요.
 
+### 모델별 주간 리밋 (RATE_API, opt-in)
+
+`/cc-dash:ccd on RATE_API`로 켭니다. Claude Code가 statusLine 페이로드에 모델별 윈도를 넣어주지 않기 때문에, 이 스위치는 Anthropic의 `GET /api/oauth/usage` 응답에서 `limits[]` 중 모델 스코프 항목(`Fable` 등)을 직접 받아옵니다. 서버가 주는 `display_name`을 그대로 라벨로 씁니다.
+
+> **⚠️ 켜기 전에 알아둘 것**
+> - **OAuth 액세스 토큰을 읽습니다** — `~/.claude/.credentials.json`(없으면 macOS 키체인 `Claude Code-credentials`). 토큰은 어디에도 출력·기록되지 않고 요청 헤더로만 쓰입니다. 토큰이 만료돼 있으면 조회를 건너뜁니다(자격증명 파일에 쓰지 않음 — 갱신은 Claude Code 몫).
+> - **비공개 엔드포인트입니다** — 문서화된 API가 아니라 Claude Code가 내부적으로 쓰는 경로입니다. 스키마가 바뀌면 세그먼트가 조용히 사라질 뿐 statusLine은 깨지지 않습니다.
+> - 기본값은 OFF입니다. 끈 상태에서는 네트워크 요청도, 자격증명 읽기도 전혀 없습니다.
+
+statusLine 자체는 여전히 네트워크를 타지 않습니다. `cc-dash-usage-fetch.sh`가 백그라운드에서 캐시(`~/.cache/cc-dash-usage`)를 갱신하고, 렌더는 그 캐시만 읽습니다. 캐시가 TTL을 넘으면 **직전 값을 그대로 보여주면서** 백그라운드 갱신을 1회 띄웁니다(깜빡임 방지). 즉시 갱신은 `/cc-dash:ccd refresh`.
+
+| 변수 | 기본값 | 의미 |
+|---|---|---|
+| `CC_DASH_USAGE_CACHE` | `~/.cache/cc-dash-usage` | 캐시 파일 경로 |
+| `CC_DASH_USAGE_TTL`   | `300`  | 캐시 유효 시간(초) |
+| `CC_DASH_USAGE_MIN_INTERVAL` | `60` | 백그라운드 갱신 최소 간격(초) |
+| `CC_DASH_USAGE_TIMEOUT` | `6`  | curl 타임아웃(초) |
+| `CC_DASH_USAGE_URL`   | `https://api.anthropic.com/api/oauth/usage` | 조회 엔드포인트 |
+| `CC_DASH_CREDENTIALS` | `~/.claude/.credentials.json` | 자격증명 파일 경로 |
+
+`RATE_MODEL`을 끄면 `RATE_API`가 켜져 있어도 조회하지 않습니다(표시할 곳이 없으므로). 진단이 필요하면 `bash scripts/cc-dash-usage-fetch.sh -v`를 직접 실행하세요 — 실패 원인을 stderr로 한 줄 출력합니다.
+
 ### 터미널 폭 클리핑
 
 `$COLUMNS`가 설정되어 있으면 1행이 잘려서 좁은 터미널에서도 2·3행이 항상 보입니다. 자동 감지를 켜려면 `~/.bashrc`에 추가하세요:
@@ -208,6 +231,7 @@ export COLUMNS
 
 - **Fast path: fork 0회.** 일반 렌더에서 `jq`, `awk`, `sed`, `cat`, `date` 없음 — bash 내장만 사용합니다(`printf -v '%(…)T'`, `[[`, `read`).
 - **Budget 위젯**: 캐시가 식었을 때만 `find -newermt` 1회 + `awk` 1회(~1초). 캐시 히트는 캐시 파일 `read` 1회(~5ms)입니다.
+- **RATE_API 위젯**: 렌더는 항상 캐시 `read` 1회입니다. 캐시가 식으면 fetcher를 백그라운드로 detach해 띄우고(stdout/stderr 차단) 렌더는 기다리지 않습니다 — 최소 간격 60초로 spawn을 억제합니다.
 - **후행 공백 트릭**: 출력 전에 모든 공백을 NBSP(` `)로 치환해 터미널이 공백을 잘라내지 않고, Claude Code의 dim 속성이 줄에 번지지 않게 합니다(`\x1b[0m` 접두).
 
 ---
@@ -226,6 +250,7 @@ export COLUMNS
 - **Budget 단가는 수동 관리입니다.** JSONL 로그에는 `cost_usd` 필드가 직접 저장되지 않아 cc-dash가 토큰 수 × 모델별 단가로 계산합니다. 환경변수를 Anthropic 가격과 동기화하세요.
 - **statusLine은 플러그인이 선언할 수 없습니다.** Claude Code 플러그인 스키마에 현재 `statusLine` 필드가 없어, 설치 후 사용자가 직접 `settings.json`에 두 줄을 추가해야 합니다.
 - **JSONL 스키마 드리프트.** Claude Code가 트랜스크립트의 usage 필드명을 바꾸면 budget 위젯의 `awk` 정규식을 갱신해야 합니다.
+- **모델별 리밋은 statusLine 페이로드에 없습니다.** `rate_limits`는 `five_hour`·`seven_day`만 담고 있어 `RATE_MODEL`은 opt-in `RATE_API`(비공개 `/api/oauth/usage` 조회, `curl` 필요) 없이는 비어 있습니다. Anthropic이 스키마를 바꾸면 세그먼트가 조용히 사라집니다.
 
 ---
 
@@ -245,7 +270,8 @@ claudecode-dashboard/         # 저장소 루트 (= 마켓플레이스)
 │       └── scripts/
 │           ├── statusline.sh     # statusLine 렌더러
 │           ├── cc-dash-config.sh # 위젯 토글 CLI + 대화식 메뉴
-│           └── cc-dash-setup.sh  # settings.json 패처 (/cc-dash:ccd-setup 이 호출)
+│           ├── cc-dash-setup.sh  # settings.json 패처 (/cc-dash:ccd-setup 이 호출)
+│           └── cc-dash-usage-fetch.sh # 모델별 리밋 조회 → 캐시 (RATE_API 전용)
 ├── LICENSE
 ├── README.md                 # 한국어 (기본)
 └── README.en.md              # English
@@ -268,6 +294,9 @@ CC_DASH_SHOW_SESSION=1 CC_DASH_SHOW_BUDGET=1 bash scripts/statusline.sh <<< '{�
 
 # refresh — 실제 settings.json / 캐시를 건드리지 않고 확인
 CC_DASH_SETTINGS=/tmp/x.json CC_DASH_CACHE=/tmp/x-cache bash scripts/cc-dash-config.sh refresh
+
+# RATE_API — 모델별 리밋 조회 단독 실행 (진단 출력은 stderr, 토큰은 노출 없음)
+CC_DASH_USAGE_CACHE=/tmp/x-usage bash scripts/cc-dash-usage-fetch.sh -v && cat /tmp/x-usage
 ```
 
 기본 렌더의 기대 출력(`widgets.conf`가 아직 없는 상태 — clock·git 위젯은 사용자 환경을 반영하며, 위 `resets_at`은 과거 시각이라 `reset` 타이머가 표시되지 않습니다):

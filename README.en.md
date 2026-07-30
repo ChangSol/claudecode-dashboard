@@ -3,7 +3,7 @@
 [한국어](README.md) | **English**
 
 **A fork-free, zero-dependency statusLine for Claude Code.**
-18 widgets — model, duration, API duration, context, tokens, cost, lines changed, budget, rate limits (incl. per-model weekly), permission, output style, version, git, project, session, clock — rendered in three rows. Toggle any widget with `/cc-dash:ccd`.
+19 widgets — model, duration, API duration, context, tokens, cost, lines changed, budget, rate limits (incl. per-model weekly), permission, output style, version, git, project, session, clock — rendered in three rows. Toggle any widget with `/cc-dash:ccd`.
 
 ```
 🧠 Opus 4.7 (1M context) │ ⏱  dur 22m0s │ 🪟 ctx 25% │ 💬 token 50.0K │ 💸 cost $0.50 │ ✏️  +120/-34
@@ -15,7 +15,7 @@
 
 ## Why
 
-Most statusLine scripts fork `jq`, `awk`, `date`, `git` every second and leave your shell wheezing. cc-dash is **pure bash built-ins on the fast path** (bash ≥ 4.3) — no forks, no `cat`, no `sed`. The one exception is the opt-in budget widget, which uses a single `awk` call with a 60-second cache.
+Most statusLine scripts fork `jq`, `awk`, `date`, `git` every second and leave your shell wheezing. cc-dash is **pure bash built-ins on the fast path** (bash ≥ 4.3) — no forks, no `cat`, no `sed`. The only exceptions are two opt-in widgets: budget makes a single `awk` call behind a 60-second cache, and `RATE_API` detaches one background fetch when its 5-minute cache goes cold.
 
 L1 is automatically clipped to terminal width (respects `$COLUMNS`) so L2 and L3 are always visible.
 
@@ -23,7 +23,7 @@ L1 is automatically clipped to terminal width (respects `$COLUMNS`) so L2 and L3
 
 ## Features
 
-- **18 widgets, all toggle-able** — `/cc-dash:ccd toggle BUDGET`, `/cc-dash:ccd off RATE_7D`, `/cc-dash:ccd reset`.
+- **19 widgets, all toggle-able** — `/cc-dash:ccd toggle BUDGET`, `/cc-dash:ccd off RATE_7D`, `/cc-dash:ccd reset`.
 - **3-row layout** — usage on row 1, rate limits on row 2, meta + clock on row 3.
 - **Self-labeling** — every icon has a short English tag so nothing is cryptic.
 - **Context %, now (5h) / week (7d) rate limits, token count, session cost** — all parsed from the statusLine JSON payload Claude Code provides.
@@ -99,7 +99,7 @@ Widget keys (case-insensitive):
 
 ```
 CLOCK  MODEL  DURATION  API_DUR  CTX  TOKEN  COST  LINES  BUDGET
-RATE_5H  RATE_7D  RATE_MODEL  PERM  STYLE  VERSION  GIT  PROJECT  SESSION
+RATE_5H  RATE_7D  RATE_MODEL  RATE_API  PERM  STYLE  VERSION  GIT  PROJECT  SESSION
 ```
 
 State is persisted at `~/.config/cc-dash/widgets.conf` (override with `CC_DASH_CONFIG`). The file is plain `KEY=0/1` — editable by hand.
@@ -147,7 +147,8 @@ After saving, `/ccd list` and `/ccd-setup` resolve to the plugin commands. User-
 | `BUDGET`   | **off** | Today's spend against a daily budget — JSONL scan, pay-as-you-go plans | `💰 budget $4.21/$15 (28%)`| 1 |
 | `RATE_5H`  | on  | 5-hour limit usage + reset timer (🔥 pace warning) | `⏳ now 19% reset 3h8m`         | 2 |
 | `RATE_7D`  | on  | Weekly (7-day) limit usage + reset timer (🔥 pace warning) | `⏳ week 2% reset 6d22h`        | 2 |
-| `RATE_MODEL` | on | Per-model weekly limits — hidden when the payload has none | `⏳ Opus 22% reset 4d2h`      | 2 |
+| `RATE_MODEL` | on | Per-model weekly limits — hidden when no data is available | `⏳ Fable 26% reset 4d2h`      | 2 |
+| `RATE_API` | **off** | Sources `RATE_MODEL` from an API lookup (opt-in, uses your OAuth token) | — | 2 |
 | `PERM`     | **off** | Current permission mode (ask·plan·accept·auto·bypass) | `🔒 perm ask`               | 3 |
 | `STYLE`    | **off** | Name of the active output style | `🎨 style Explanatory`      | 3 |
 | `VERSION`  | on  | Running Claude Code version | `🚀 cc v2.1.116`                | 3 |
@@ -162,7 +163,7 @@ Usage extras (no separate toggles — they ride their parent widget):
 - `CTX` appends `(used/total)` when the payload carries `context_window_size`.
 - `COST` appends an hourly burn-rate estimate (`~$X.X/h`) once the session is 5+ minutes old.
 - `RATE_5H` / `RATE_7D` append 🔥 when your usage % is ≥15 points ahead of the window's elapsed time — you are on pace to exhaust the limit before it resets.
-- `RATE_MODEL` renders one segment per model-scoped weekly window in the payload (`seven_day_opus`, `seven_day_sonnet`, …) with the same colors/timer/🔥 treatment, labeled by model (`Opus 22%`). Hidden automatically when the payload carries none — Claude Code only sends these on plans with per-model weekly limits.
+- `RATE_MODEL` renders one segment per model-scoped weekly window with the same colors/timer/🔥 treatment as `RATE_7D`, labeled by model (`Fable 26%`). It hides itself when no data is available. **As of Claude Code 2.1.220 the statusLine payload's `rate_limits` carries only `five_hour` and `seven_day`**, so per-model values require the `RATE_API` switch below. If a future payload adds `seven_day_opus`-style fields, those win and no network lookup happens.
 
 ---
 
@@ -188,6 +189,28 @@ Rates are applied **per model**: each JSONL line's `model` field selects the pri
 
 Setting **any** `CC_DASH_RATE_*` variable switches back to legacy single-rate mode: your rates apply to every line regardless of model (useful for discounted/introductory pricing). Unset variables fall back to the defaults in the table above — set all four for fully custom pricing.
 
+### Per-model weekly limits (RATE_API, opt-in)
+
+Turn it on with `/cc-dash:ccd on RATE_API`. Because Claude Code does not put per-model windows in the statusLine payload, this switch reads them straight from Anthropic's `GET /api/oauth/usage` response — the model-scoped entries in `limits[]` (`Fable`, …). The server-supplied `display_name` becomes the label.
+
+> **⚠️ Before you enable it**
+> - **It reads your OAuth access token** — from `~/.claude/.credentials.json`, falling back to the macOS keychain entry `Claude Code-credentials`. The token is never printed or written anywhere; it is only used as a request header. If it has expired the lookup is skipped (cc-dash never writes to the credentials file — refreshing is Claude Code's job).
+> - **The endpoint is private** — it is not a documented API, just the path Claude Code uses internally. If the schema changes the segment disappears silently; the statusLine keeps working.
+> - Default is OFF. While it is off there is no network request and no credential read at all.
+
+The statusLine itself still never touches the network: `cc-dash-usage-fetch.sh` refreshes a cache (`~/.cache/cc-dash-usage`) in the background and the render only reads that file. When the cache goes stale the render **keeps showing the previous values** and detaches one background refresh (no flicker). For an immediate refresh, run `/cc-dash:ccd refresh`.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `CC_DASH_USAGE_CACHE` | `~/.cache/cc-dash-usage` | cache file path |
+| `CC_DASH_USAGE_TTL`   | `300`  | cache lifetime (seconds) |
+| `CC_DASH_USAGE_MIN_INTERVAL` | `60` | minimum gap between background refreshes (seconds) |
+| `CC_DASH_USAGE_TIMEOUT` | `6`  | curl timeout (seconds) |
+| `CC_DASH_USAGE_URL`   | `https://api.anthropic.com/api/oauth/usage` | lookup endpoint |
+| `CC_DASH_CREDENTIALS` | `~/.claude/.credentials.json` | credentials file path |
+
+Turning `RATE_MODEL` off disables the lookup even when `RATE_API` is on (nowhere to render it). To diagnose, run `bash scripts/cc-dash-usage-fetch.sh -v` — it prints a one-line reason to stderr.
+
 ### Terminal width clipping
 
 L1 is clipped to `$COLUMNS` when set, so L2 and L3 are always visible on narrow terminals. To enable auto-detection, add to `~/.bashrc`:
@@ -208,6 +231,7 @@ The old opt-in env vars still work and override config-file state:
 
 - **Fast path: zero forks.** No `jq`, `awk`, `sed`, `cat`, or `date` on normal renders — only bash built-ins (`printf -v '%(…)T'`, `[[`, `read`).
 - **Budget widget**: one `find -newermt` + one `awk` only when cache is cold (~1 s). Cache hits are a single `read` from the cache file (~5 ms).
+- **RATE_API widget**: the render is always one cache `read`. When the cache is cold it detaches the fetcher in the background (stdout/stderr closed) and never waits on it — spawns are throttled to one per 60 seconds.
 - **Trailing-whitespace trick**: every space is replaced with NBSP (` `) before output, so terminals don't trim and the Claude Code dim attribute doesn't bleed into the line (`\x1b[0m` prefix).
 
 ---
@@ -226,6 +250,7 @@ The old opt-in env vars still work and override config-file state:
 - **Budget rates are manual.** JSONL logs don't store a `cost_usd` field directly; cc-dash multiplies token counts by per-model rates. Keep the env vars in sync with Anthropic's pricing.
 - **statusLine is not plugin-declared.** Claude Code's plugin schema currently exposes no `statusLine` field, so users have to add a two-line entry to their own `settings.json` after installing the plugin.
 - **JSONL schema drift.** If Claude Code renames usage fields in the transcript, the `awk` regexes in the budget widget need to be updated.
+- **Per-model limits are absent from the statusLine payload.** `rate_limits` carries only `five_hour` and `seven_day`, so `RATE_MODEL` stays empty without the opt-in `RATE_API` lookup (private `/api/oauth/usage`, needs `curl`). If Anthropic changes that schema, the segment disappears silently.
 
 ---
 
@@ -245,7 +270,8 @@ claudecode-dashboard/         # repo root (= marketplace)
 │       └── scripts/
 │           ├── statusline.sh     # the statusLine renderer
 │           ├── cc-dash-config.sh # widget toggle CLI + interactive menu
-│           └── cc-dash-setup.sh  # settings.json patcher (called by /cc-dash:ccd-setup)
+│           ├── cc-dash-setup.sh  # settings.json patcher (called by /cc-dash:ccd-setup)
+│           └── cc-dash-usage-fetch.sh # per-model limit lookup → cache (RATE_API only)
 ├── LICENSE
 ├── README.md                 # Korean (default)
 └── README.en.md              # this file
@@ -268,6 +294,9 @@ CC_DASH_SHOW_SESSION=1 CC_DASH_SHOW_BUDGET=1 bash scripts/statusline.sh <<< '{�
 
 # refresh — exercise it without touching your real settings.json / cache
 CC_DASH_SETTINGS=/tmp/x.json CC_DASH_CACHE=/tmp/x-cache bash scripts/cc-dash-config.sh refresh
+
+# RATE_API — run the per-model lookup on its own (diagnostics on stderr, token never printed)
+CC_DASH_USAGE_CACHE=/tmp/x-usage bash scripts/cc-dash-usage-fetch.sh -v && cat /tmp/x-usage
 ```
 
 Expected output for the default render (no `widgets.conf` yet — clock and git widgets reflect your environment; the `resets_at` timestamps above are in the past, so no `reset` timers appear):
