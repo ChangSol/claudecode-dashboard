@@ -209,7 +209,7 @@ statusLine 자체는 여전히 네트워크를 타지 않습니다. `cc-dash-usa
 | `CC_DASH_USAGE_URL`   | `https://api.anthropic.com/api/oauth/usage` | 조회 엔드포인트 |
 | `CC_DASH_CREDENTIALS` | `~/.claude/.credentials.json` | 자격증명 파일 경로 |
 
-`RATE_MODEL`을 끄면 `RATE_API`가 켜져 있어도 조회하지 않습니다(표시할 곳이 없으므로). 진단이 필요하면 `bash scripts/cc-dash-usage-fetch.sh -v`를 직접 실행하세요 — 실패 원인을 stderr로 한 줄 출력합니다.
+`RATE_MODEL`을 끄면 `RATE_API`가 켜져 있어도 조회하지 않습니다(표시할 곳이 없으므로). 이 조합은 `/cc-dash:ccd list` 등 설정을 조회·변경할 때 `warning:`으로 알려줍니다. 진단이 필요하면 `bash scripts/cc-dash-usage-fetch.sh -v`를 직접 실행하세요 — 실패 원인을 stderr로 한 줄 출력합니다.
 
 ### 터미널 폭 클리핑
 

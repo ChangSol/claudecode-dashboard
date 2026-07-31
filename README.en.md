@@ -209,7 +209,7 @@ The statusLine itself still never touches the network: `cc-dash-usage-fetch.sh` 
 | `CC_DASH_USAGE_URL`   | `https://api.anthropic.com/api/oauth/usage` | lookup endpoint |
 | `CC_DASH_CREDENTIALS` | `~/.claude/.credentials.json` | credentials file path |
 
-Turning `RATE_MODEL` off disables the lookup even when `RATE_API` is on (nowhere to render it). To diagnose, run `bash scripts/cc-dash-usage-fetch.sh -v` — it prints a one-line reason to stderr.
+Turning `RATE_MODEL` off disables the lookup even when `RATE_API` is on (nowhere to render it). This combination is flagged with a `warning:` line whenever you view or change the config, e.g. via `/cc-dash:ccd list`. To diagnose, run `bash scripts/cc-dash-usage-fetch.sh -v` — it prints a one-line reason to stderr.
 
 ### Terminal width clipping
 

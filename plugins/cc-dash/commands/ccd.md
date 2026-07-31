@@ -12,5 +12,6 @@ cc-dash 위젯 설정 조회/변경.
 - 조회(list/ls/status 또는 인자 없음): 표를 그대로 코드블록으로. 요약 덧붙이지 마.
 - help: 사용법 그대로.
 - 변경(on/off/toggle/reset/all-on/all-off): 바뀐 위젯만 한 줄 확인(예: "BUDGET ON 💰").
+- 어느 서브커맨드든 출력에 `warning:` 줄이 있으면 그대로 전달.
 - refresh: 캐시 처리 한 줄(budget + usage) + statusLine 결과 한 줄. `updated` 면 "다음 턴부터 새 경로 적용", `already up to date` 면 "경로 최신". `warning:` 이 있으면 그대로 전달. `usage 조회 off` 면 `RATE_API` 를 켜는 방법 한 줄 안내.
 - 에러(알 수 없는/사용법): 메시지 그대로 + 사용법 한 줄.

@@ -59,6 +59,13 @@ valid_key() {
   return 1
 }
 
+# RATE_API(조회)만 켜고 RATE_MODEL(표시)이 꺼진 죽은 조합 — 조회 결과가 렌더될 곳이 없다
+warn_rate_combo() {
+  if [[ "${STATE[RATE_API]}" == "1" && "${STATE[RATE_MODEL]}" != "1" ]]; then
+    printf 'warning: RATE_API 는 ON 인데 RATE_MODEL 이 off — 조회해도 위젯이 표시되지 않는다. 켜려면: cc-dash-config.sh on RATE_MODEL\n' >&2
+  fi
+}
+
 print_status() {
   printf '설정 파일: %s\n' "$CFG_FILE"
   local entry key label v mark use_color=1
@@ -75,6 +82,7 @@ print_status() {
     fi
     printf '  %-12s %s  %s\n' "$key" "$mark" "$label"
   done
+  warn_rate_combo
 }
 
 save_file() {
@@ -129,7 +137,11 @@ if [[ $# -gt 0 ]]; then
       # (꺼져 있으면 네트워크·토큰 접근 없음 — 캐시/마커만 정리한다.)
       usage_cache="${CC_DASH_USAGE_CACHE:-$HOME/.cache/cc-dash-usage}"
       [[ -f "${usage_cache}.attempt" ]] && rm "${usage_cache}.attempt" 2>/dev/null
-      if [[ "${STATE[RATE_API]}" == "1" ]]; then
+      if [[ "${STATE[RATE_API]}" == "1" && "${STATE[RATE_MODEL]}" != "1" ]]; then
+        # 죽은 조합 — README 문서화 동작(표시 없으면 조회 없음)과 정합: 조회를 생략한다
+        printf 'usage 조회 생략 — RATE_MODEL 이 off 라 위젯이 표시되지 않는다. 켜려면: cc-dash-config.sh on RATE_MODEL\n'
+        warn_rate_combo
+      elif [[ "${STATE[RATE_API]}" == "1" ]]; then
         fetch_sh="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/cc-dash-usage-fetch.sh"
         if [[ -f "$fetch_sh" ]]; then
           if bash "$fetch_sh" -v; then
@@ -212,7 +224,7 @@ while true; do
   [[ -n "$msg" ]] && { printf '\n%s\n' "$msg"; msg=""; }
   IFS= read -r choice || { printf '\n(stdin 종료 — 저장 없이 나감)\n'; exit 0; }
   case "$choice" in
-    s|S) save_file; printf '\n저장 완료: %s\n' "$CFG_FILE"; exit 0;;
+    s|S) save_file; printf '\n저장 완료: %s\n' "$CFG_FILE"; warn_rate_combo; exit 0;;
     q|Q) printf '취소됨 (저장 안 함)\n'; exit 0;;
     a|A) for e in "${WIDGETS[@]}"; do STATE["${e%%:*}"]=1; done;;
     n|N) for e in "${WIDGETS[@]}"; do STATE["${e%%:*}"]=0; done;;
