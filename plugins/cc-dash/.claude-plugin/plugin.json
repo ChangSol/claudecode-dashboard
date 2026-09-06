@@ -1,6 +1,6 @@
 {
   "name": "cc-dash",
-  "version": "1.2.1",
+  "version": "1.3.0",
   "description": "Fork-free bash statusLine for Claude Code — 20 widgets (model, effort, duration, api duration, context, tokens, cost, lines changed, budget, now/week/per-model rate limits, permission, output style, version, git, project, session, clock) rendered in 3 compact rows. Toggle widgets on/off via /cc-dash:ccd.",
   "author": {
     "name": "ChangSolution"
