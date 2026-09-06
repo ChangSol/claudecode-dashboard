@@ -3,12 +3,12 @@
 [한국어](README.md) | **English**
 
 **A fork-free, zero-dependency statusLine for Claude Code.**
-19 widgets — model, duration, API duration, context, tokens, cost, lines changed, budget, rate limits (incl. per-model weekly), permission, output style, version, git, project, session, clock — rendered in three rows. Toggle any widget with `/cc-dash:ccd`.
+20 widgets — model, effort, duration, API duration, context, tokens, cost, lines changed, budget, rate limits (incl. per-model weekly), permission, output style, version, git, project, session, clock — rendered in three rows. Toggle any widget with `/cc-dash:ccd`.
 
 ```
-🧠 Opus 4.7 (1M context) │ ⏱  dur 22m0s │ 🪟 ctx 25% │ 💬 token 50.0K │ 💸 cost $0.50 │ ✏️  +120/-34
-⏳ now 0% reset 3h0m │ ⏳ week 2% reset 6d22h
-🚀 cc v2.1.116 │ 🔀 git: main │ 🕐 2026.04.21 13:03
+🤖 Opus 4.7 (1M context) │ 🧠 effort high │ ⏱  dur 22m0s │ 📊 ctx 25% │ 🪙 token 50.0K │ 💸 cost $0.50 │ ✏️  +120/-34
+⚡ now 0% reset 3h0m │ 📅 week 2% reset 6d22h
+🚀 cc v2.1.116 │ 🌿 git: main │ 🕐 2026.04.21 13:03
 ```
 
 ---
@@ -23,11 +23,11 @@ L1 is automatically clipped to terminal width (respects `$COLUMNS`) so L2 and L3
 
 ## Features
 
-- **19 widgets, all toggle-able** — `/cc-dash:ccd toggle BUDGET`, `/cc-dash:ccd off RATE_7D`, `/cc-dash:ccd reset`.
+- **20 widgets, all toggle-able** — `/cc-dash:ccd toggle BUDGET`, `/cc-dash:ccd off RATE_7D`, `/cc-dash:ccd reset`.
 - **3-row layout** — usage on row 1, rate limits on row 2, meta + clock on row 3.
 - **Self-labeling** — every icon has a short English tag so nothing is cryptic.
 - **Context %, now (5h) / week (7d) rate limits, token count, session cost** — all parsed from the statusLine JSON payload Claude Code provides.
-- **Threshold colors** — ≥50% amber, ≥80% red. `⏳` flips to `⌛` when quota is hot; 🔥 appears when usage runs ahead of the window's reset pace.
+- **Threshold colors** — ≥50% amber, ≥80% red. The limit icons (⚡/📅/🎯) flip to `⌛` when quota is hot; 🔥 appears when usage runs ahead of the window's reset pace.
 - **Git branch** + in-progress indicator (`*` for merge/rebase).
 - **Optional budget widget** — scans today's JSONL logs to track daily spend against `$CC_DASH_BUDGET`.
 - **PROJECT and SESSION** as separate toggle-able widgets.
@@ -98,7 +98,7 @@ Claude Code plugin slash commands require the `<plugin-name>:` namespace prefix,
 Widget keys (case-insensitive):
 
 ```
-CLOCK  MODEL  DURATION  API_DUR  CTX  TOKEN  COST  LINES  BUDGET
+CLOCK  MODEL  EFFORT  DURATION  API_DUR  CTX  TOKEN  COST  LINES  BUDGET
 RATE_5H  RATE_7D  RATE_MODEL  RATE_API  PERM  STYLE  VERSION  GIT  PROJECT  SESSION
 ```
 
@@ -137,22 +137,23 @@ After saving, `/ccd list` and `/ccd-setup` resolve to the plugin commands. User-
 
 | Key | Default | What it shows | Example | Row |
 |---|---|---|---|---|
-| `MODEL`    | on  | Display name of the active model | `🧠 Opus 4.7 (1M context)`      | 1 |
+| `MODEL`    | on  | Display name of the active model | `🤖 Opus 4.7 (1M context)`      | 1 |
+| `EFFORT`   | on  | Current reasoning effort (low·medium·high·xhigh·max) — reflects `/effort` changes immediately, hidden when the model doesn't support it | `🧠 effort xhigh`             | 1 |
 | `DURATION` | on  | Wall-clock time since the session started | `⏱  dur 22m23s`                 | 1 |
-| `API_DUR`  | **off** | Cumulative time spent waiting on API calls | `🌐 api 4m32s`              | 1 |
-| `CTX`      | on  | Context usage — appends used/total when the payload carries it | `🪟 ctx 25% (50.0K/200.0K)`     | 1 |
-| `TOKEN`    | on  | Cumulative input tokens for the session | `💬 token 58.3K`                | 1 |
+| `API_DUR`  | **off** | Cumulative time spent waiting on API calls | `📡 api 4m32s`              | 1 |
+| `CTX`      | on  | Context usage — appends used/total when the payload carries it | `📊 ctx 25% (50.0K/200.0K)`     | 1 |
+| `TOKEN`    | on  | Cumulative input tokens for the session | `🪙 token 58.3K`                | 1 |
 | `COST`     | on  | Session cost — appends burn rate past 5 minutes | `💸 cost $1.66 (~$4.5/h)`       | 1 |
 | `LINES`    | on  | Code lines added/removed during the session | `✏️  +120/-34`                  | 1 |
 | `BUDGET`   | **off** | Today's spend against a daily budget — JSONL scan, pay-as-you-go plans | `💰 budget $4.21/$15 (28%)`| 1 |
-| `RATE_5H`  | on  | 5-hour limit usage + reset timer (🔥 pace warning) | `⏳ now 19% reset 3h8m`         | 2 |
-| `RATE_7D`  | on  | Weekly (7-day) limit usage + reset timer (🔥 pace warning) | `⏳ week 2% reset 6d22h`        | 2 |
-| `RATE_MODEL` | on | Per-model weekly limits — hidden when no data is available | `⏳ Fable 26% reset 4d2h`      | 2 |
+| `RATE_5H`  | on  | 5-hour limit usage + reset timer (🔥 pace warning) | `⚡ now 19% reset 3h8m`         | 2 |
+| `RATE_7D`  | on  | Weekly (7-day) limit usage + reset timer (🔥 pace warning) | `📅 week 2% reset 6d22h`        | 2 |
+| `RATE_MODEL` | on | Per-model weekly limits — hidden when no data is available | `🎯 Fable 26% reset 4d2h`      | 2 |
 | `RATE_API` | **off** | Sources `RATE_MODEL` from an API lookup (opt-in, uses your OAuth token) | — | 2 |
 | `PERM`     | **off** | Current permission mode (ask·plan·accept·auto·bypass) | `🔒 perm ask`               | 3 |
 | `STYLE`    | **off** | Name of the active output style | `🎨 style Explanatory`      | 3 |
 | `VERSION`  | on  | Running Claude Code version | `🚀 cc v2.1.116`                | 3 |
-| `GIT`      | on  | Current branch — `*` means a merge/rebase is in progress | `🔀 git: main` / `🔀 git: main*`| 3 |
+| `GIT`      | on  | Current branch — `*` means a merge/rebase is in progress | `🌿 git: main` / `🌿 git: main*`| 3 |
 | `PROJECT`  | **off** | Working directory name | `📁 proj: cc-dash`          | 3 |
 | `SESSION`  | **off** | First 8 characters of the session ID | `🆔 ab12cd34`               | 3 |
 | `CLOCK`    | on  | Current date and time | `🕐 2026.04.21 13:03`           | 3 (rightmost) |
@@ -251,6 +252,7 @@ The old opt-in env vars still work and override config-file state:
 - **statusLine is not plugin-declared.** Claude Code's plugin schema currently exposes no `statusLine` field, so users have to add a two-line entry to their own `settings.json` after installing the plugin.
 - **JSONL schema drift.** If Claude Code renames usage fields in the transcript, the `awk` regexes in the budget widget need to be updated.
 - **Per-model limits are absent from the statusLine payload.** `rate_limits` carries only `five_hour` and `seven_day`, so `RATE_MODEL` stays empty without the opt-in `RATE_API` lookup (private `/api/oauth/usage`, needs `curl`). If Anthropic changes that schema, the segment disappears silently.
+- **`spend_limit` is parsed but not shown.** On apps-gateway accounts `rate_limits.spend_limit` is consumed only so its value cannot bleed into the context % — there is no display widget for it yet.
 
 ---
 
@@ -283,7 +285,7 @@ claudecode-dashboard/         # repo root (= marketplace)
 
 ```bash
 # Render with a synthetic payload
-echo '{"model":{"display_name":"Opus 4.7 (1M context)","id":"claude-opus-4-7"},"output_style":{"name":"default"},"context_window_size":200000,"used_percentage":25,"total_input_tokens":50000,"total_duration_ms":120000,"total_api_duration_ms":95000,"total_cost_usd":0.5,"total_lines_added":120,"total_lines_removed":34,"session_id":"abc12345","current_dir":".","permission_mode":"default","version":"2.1.116","rate_limits":{"five_hour":{"used_percentage":7,"resets_at":1745289600},"seven_day":{"used_percentage":26,"resets_at":1745808000}}}' \
+echo '{"model":{"display_name":"Opus 4.7 (1M context)","id":"claude-opus-4-7"},"effort":{"level":"high"},"output_style":{"name":"default"},"context_window_size":200000,"used_percentage":25,"total_input_tokens":50000,"total_duration_ms":120000,"total_api_duration_ms":95000,"total_cost_usd":0.5,"total_lines_added":120,"total_lines_removed":34,"session_id":"abc12345","current_dir":".","permission_mode":"default","version":"2.1.116","rate_limits":{"five_hour":{"used_percentage":7,"resets_at":1745289600},"seven_day":{"used_percentage":26,"resets_at":1745808000}}}' \
   | bash scripts/statusline.sh
 
 # Time it
@@ -302,12 +304,12 @@ CC_DASH_USAGE_CACHE=/tmp/x-usage bash scripts/cc-dash-usage-fetch.sh -v && cat /
 Expected output for the default render (no `widgets.conf` yet — clock and git widgets reflect your environment; the `resets_at` timestamps above are in the past, so no `reset` timers appear):
 
 ```
-🧠 Opus 4.7 (1M context) │ ⏱  dur 2m0s │ 🪟 ctx 25% (50.0K/200.0K) │ 💬 token 50.0K │ 💸 cost $0.50 │ ✏️  +120/-34
-⏳ now 7% │ ⏳ week 26%
-🚀 cc v2.1.116 │ 🔀 git — │ 🕐 2026.04.21 14:53
+🤖 Opus 4.7 (1M context) │ 🧠 effort high │ ⏱  dur 2m0s │ 📊 ctx 25% (50.0K/200.0K) │ 🪙 token 50.0K │ 💸 cost $0.50 │ ✏️  +120/-34
+⚡ now 7% │ 📅 week 26%
+🚀 cc v2.1.116 │ 🌿 git — │ 🕐 2026.04.21 14:53
 ```
 
-`API_DUR` (`🌐 api 1m35s`) and `STYLE` (`🎨 style default`) are off by default — `/cc-dash:ccd on API_DUR STYLE` to see them.
+`API_DUR` (`📡 api 1m35s`) and `STYLE` (`🎨 style default`) are off by default — `/cc-dash:ccd on API_DUR STYLE` to see them.
 
 Typical wall-clock on Git Bash for Windows is **100–140 ms** (dominated by bash startup and JSON parse; the budget widget is off by default so no JSONL scan). Native bash 5.2 on Linux/macOS is typically faster.
 

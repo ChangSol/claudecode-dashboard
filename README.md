@@ -3,12 +3,12 @@
 **한국어** | [English](README.en.md)
 
 **fork 없는 무의존성 Claude Code statusLine.**
-19개 위젯 — 모델, 경과 시간, API 시간, 컨텍스트, 토큰, 비용, 변경 라인, 예산, 리밋(모델별 주간 포함), 권한, output style, 버전, git, 프로젝트, 세션, 시각 — 을 3행으로 렌더링합니다. `/cc-dash:ccd`로 위젯별 ON/OFF.
+20개 위젯 — 모델, effort, 경과 시간, API 시간, 컨텍스트, 토큰, 비용, 변경 라인, 예산, 리밋(모델별 주간 포함), 권한, output style, 버전, git, 프로젝트, 세션, 시각 — 을 3행으로 렌더링합니다. `/cc-dash:ccd`로 위젯별 ON/OFF.
 
 ```
-🧠 Opus 4.7 (1M context) │ ⏱  dur 22m0s │ 🪟 ctx 25% │ 💬 token 50.0K │ 💸 cost $0.50 │ ✏️  +120/-34
-⏳ now 0% reset 3h0m │ ⏳ week 2% reset 6d22h
-🚀 cc v2.1.116 │ 🔀 git: main │ 🕐 2026.04.21 13:03
+🤖 Opus 4.7 (1M context) │ 🧠 effort high │ ⏱  dur 22m0s │ 📊 ctx 25% │ 🪙 token 50.0K │ 💸 cost $0.50 │ ✏️  +120/-34
+⚡ now 0% reset 3h0m │ 📅 week 2% reset 6d22h
+🚀 cc v2.1.116 │ 🌿 git: main │ 🕐 2026.04.21 13:03
 ```
 
 ---
@@ -23,11 +23,11 @@
 
 ## 주요 기능
 
-- **19개 위젯 전부 토글 가능** — `/cc-dash:ccd toggle BUDGET`, `/cc-dash:ccd off RATE_7D`, `/cc-dash:ccd reset`.
+- **20개 위젯 전부 토글 가능** — `/cc-dash:ccd toggle BUDGET`, `/cc-dash:ccd off RATE_7D`, `/cc-dash:ccd reset`.
 - **3행 레이아웃** — 1행 사용량, 2행 리밋, 3행 메타 + 시계.
 - **셀프 라벨링** — 모든 아이콘에 짧은 영문 태그가 붙어 있어 의미가 헷갈리지 않습니다.
 - **컨텍스트 %, now(5h)/week(7d) 리밋, 토큰 수, 세션 비용** — 전부 Claude Code가 제공하는 statusLine JSON 페이로드에서 파싱합니다.
-- **임계 색상** — ≥50% 주황, ≥80% 빨강. 쿼터가 뜨거우면 `⏳`가 `⌛`로 바뀌고, 사용률이 리셋 페이스보다 앞서면 🔥가 붙습니다.
+- **임계 색상** — ≥50% 주황, ≥80% 빨강. 쿼터가 뜨거우면 리밋 아이콘(⚡/📅/🎯)이 `⌛`로 바뀌고, 사용률이 리셋 페이스보다 앞서면 🔥가 붙습니다.
 - **Git 브랜치** + 진행 중 표시(merge/rebase 시 `*`).
 - **선택형 budget 위젯** — 오늘의 JSONL 로그를 스캔해 `$CC_DASH_BUDGET` 대비 일일 지출을 추적합니다.
 - **PROJECT / SESSION** 별도 토글 위젯.
@@ -98,7 +98,7 @@ Claude Code 플러그인 슬래시 커맨드는 `<plugin-name>:` 네임스페이
 위젯 키(대소문자 무관):
 
 ```
-CLOCK  MODEL  DURATION  API_DUR  CTX  TOKEN  COST  LINES  BUDGET
+CLOCK  MODEL  EFFORT  DURATION  API_DUR  CTX  TOKEN  COST  LINES  BUDGET
 RATE_5H  RATE_7D  RATE_MODEL  RATE_API  PERM  STYLE  VERSION  GIT  PROJECT  SESSION
 ```
 
@@ -137,22 +137,23 @@ description: alias for /cc-dash:ccd-setup
 
 | 키 | 기본 | 설명 | 예시 | 행 |
 |---|---|---|---|---|
-| `MODEL`    | on  | 현재 모델 표시명 | `🧠 Opus 4.7 (1M context)`      | 1 |
+| `MODEL`    | on  | 현재 모델 표시명 | `🤖 Opus 4.7 (1M context)`      | 1 |
+| `EFFORT`   | on  | 현재 reasoning effort (low·medium·high·xhigh·max) — `/effort` 변경 즉시 반영, 모델 미지원 시 자동 숨김 | `🧠 effort xhigh`             | 1 |
 | `DURATION` | on  | 세션 시작 이후 경과 시간 | `⏱  dur 22m23s`                 | 1 |
-| `API_DUR`  | **off** | API 호출에 쓴 누적 시간 (경과 시간 중 실제 대기분) | `🌐 api 4m32s`              | 1 |
-| `CTX`      | on  | 컨텍스트 사용률 — 페이로드가 주면 사용/전체 토큰 병기 | `🪟 ctx 25% (50.0K/200.0K)`     | 1 |
-| `TOKEN`    | on  | 세션 누적 입력 토큰 | `💬 token 58.3K`                | 1 |
+| `API_DUR`  | **off** | API 호출에 쓴 누적 시간 (경과 시간 중 실제 대기분) | `📡 api 4m32s`              | 1 |
+| `CTX`      | on  | 컨텍스트 사용률 — 페이로드가 주면 사용/전체 토큰 병기 | `📊 ctx 25% (50.0K/200.0K)`     | 1 |
+| `TOKEN`    | on  | 세션 누적 입력 토큰 | `🪙 token 58.3K`                | 1 |
 | `COST`     | on  | 세션 누적 비용 — 5분 이상이면 시간당 소진율 병기 | `💸 cost $1.66 (~$4.5/h)`       | 1 |
 | `LINES`    | on  | 세션 중 추가/삭제한 코드 라인 수 | `✏️  +120/-34`                  | 1 |
 | `BUDGET`   | **off** | 오늘 지출 대비 일일 예산 — JSONL 스캔, 종량제 플랜용 | `💰 budget $4.21/$15 (28%)`| 1 |
-| `RATE_5H`  | on  | 5시간 리밋 사용률 + 리셋 타이머 (🔥 페이스 경고) | `⏳ now 19% reset 3h8m`         | 2 |
-| `RATE_7D`  | on  | 주간(7일) 리밋 사용률 + 리셋 타이머 (🔥 페이스 경고) | `⏳ week 2% reset 6d22h`        | 2 |
-| `RATE_MODEL` | on | 모델별 주간 리밋 — 데이터가 없으면 자동 숨김 | `⏳ Fable 26% reset 4d2h`      | 2 |
+| `RATE_5H`  | on  | 5시간 리밋 사용률 + 리셋 타이머 (🔥 페이스 경고) | `⚡ now 19% reset 3h8m`         | 2 |
+| `RATE_7D`  | on  | 주간(7일) 리밋 사용률 + 리셋 타이머 (🔥 페이스 경고) | `📅 week 2% reset 6d22h`        | 2 |
+| `RATE_MODEL` | on | 모델별 주간 리밋 — 데이터가 없으면 자동 숨김 | `🎯 Fable 26% reset 4d2h`      | 2 |
 | `RATE_API` | **off** | `RATE_MODEL`의 데이터 출처를 API 조회로 확보 (opt-in, OAuth 토큰 사용) | — | 2 |
 | `PERM`     | **off** | 현재 권한 모드 (ask·plan·accept·auto·bypass) | `🔒 perm ask`               | 3 |
 | `STYLE`    | **off** | 활성 output style 이름 | `🎨 style Explanatory`      | 3 |
 | `VERSION`  | on  | 실행 중인 Claude Code 버전 | `🚀 cc v2.1.116`                | 3 |
-| `GIT`      | on  | 현재 브랜치 — `*`는 merge/rebase 진행 중 | `🔀 git: main` / `🔀 git: main*`| 3 |
+| `GIT`      | on  | 현재 브랜치 — `*`는 merge/rebase 진행 중 | `🌿 git: main` / `🌿 git: main*`| 3 |
 | `PROJECT`  | **off** | 작업 디렉터리 이름 | `📁 proj: cc-dash`          | 3 |
 | `SESSION`  | **off** | 세션 ID 앞 8자 | `🆔 ab12cd34`               | 3 |
 | `CLOCK`    | on  | 현재 날짜·시각 | `🕐 2026.04.21 13:03`           | 3 (맨 오른쪽) |
@@ -251,6 +252,7 @@ export COLUMNS
 - **statusLine은 플러그인이 선언할 수 없습니다.** Claude Code 플러그인 스키마에 현재 `statusLine` 필드가 없어, 설치 후 사용자가 직접 `settings.json`에 두 줄을 추가해야 합니다.
 - **JSONL 스키마 드리프트.** Claude Code가 트랜스크립트의 usage 필드명을 바꾸면 budget 위젯의 `awk` 정규식을 갱신해야 합니다.
 - **모델별 리밋은 statusLine 페이로드에 없습니다.** `rate_limits`는 `five_hour`·`seven_day`만 담고 있어 `RATE_MODEL`은 opt-in `RATE_API`(비공개 `/api/oauth/usage` 조회, `curl` 필요) 없이는 비어 있습니다. Anthropic이 스키마를 바꾸면 세그먼트가 조용히 사라집니다.
+- **gateway의 `spend_limit`은 표시하지 않습니다.** apps gateway 환경에서 `rate_limits.spend_limit`이 오면 파싱만 합니다(값이 컨텍스트 %를 덮어쓰지 않도록 소비) — 표시 위젯은 아직 없습니다.
 
 ---
 
@@ -283,7 +285,7 @@ claudecode-dashboard/         # 저장소 루트 (= 마켓플레이스)
 
 ```bash
 # 합성 페이로드로 렌더
-echo '{"model":{"display_name":"Opus 4.7 (1M context)","id":"claude-opus-4-7"},"output_style":{"name":"default"},"context_window_size":200000,"used_percentage":25,"total_input_tokens":50000,"total_duration_ms":120000,"total_api_duration_ms":95000,"total_cost_usd":0.5,"total_lines_added":120,"total_lines_removed":34,"session_id":"abc12345","current_dir":".","permission_mode":"default","version":"2.1.116","rate_limits":{"five_hour":{"used_percentage":7,"resets_at":1745289600},"seven_day":{"used_percentage":26,"resets_at":1745808000}}}' \
+echo '{"model":{"display_name":"Opus 4.7 (1M context)","id":"claude-opus-4-7"},"effort":{"level":"high"},"output_style":{"name":"default"},"context_window_size":200000,"used_percentage":25,"total_input_tokens":50000,"total_duration_ms":120000,"total_api_duration_ms":95000,"total_cost_usd":0.5,"total_lines_added":120,"total_lines_removed":34,"session_id":"abc12345","current_dir":".","permission_mode":"default","version":"2.1.116","rate_limits":{"five_hour":{"used_percentage":7,"resets_at":1745289600},"seven_day":{"used_percentage":26,"resets_at":1745808000}}}' \
   | bash scripts/statusline.sh
 
 # 실행 시간 측정
@@ -302,12 +304,12 @@ CC_DASH_USAGE_CACHE=/tmp/x-usage bash scripts/cc-dash-usage-fetch.sh -v && cat /
 기본 렌더의 기대 출력(`widgets.conf`가 아직 없는 상태 — clock·git 위젯은 사용자 환경을 반영하며, 위 `resets_at`은 과거 시각이라 `reset` 타이머가 표시되지 않습니다):
 
 ```
-🧠 Opus 4.7 (1M context) │ ⏱  dur 2m0s │ 🪟 ctx 25% (50.0K/200.0K) │ 💬 token 50.0K │ 💸 cost $0.50 │ ✏️  +120/-34
-⏳ now 7% │ ⏳ week 26%
-🚀 cc v2.1.116 │ 🔀 git — │ 🕐 2026.04.21 14:53
+🤖 Opus 4.7 (1M context) │ 🧠 effort high │ ⏱  dur 2m0s │ 📊 ctx 25% (50.0K/200.0K) │ 🪙 token 50.0K │ 💸 cost $0.50 │ ✏️  +120/-34
+⚡ now 7% │ 📅 week 26%
+🚀 cc v2.1.116 │ 🌿 git — │ 🕐 2026.04.21 14:53
 ```
 
-`API_DUR`(`🌐 api 1m35s`)와 `STYLE`(`🎨 style default`)은 기본 OFF입니다 — `/cc-dash:ccd on API_DUR STYLE`로 확인하세요.
+`API_DUR`(`📡 api 1m35s`)와 `STYLE`(`🎨 style default`)은 기본 OFF입니다 — `/cc-dash:ccd on API_DUR STYLE`로 확인하세요.
 
 Windows Git Bash 기준 일반적인 실측 시간은 **100–140ms**입니다(bash 기동과 JSON 파싱이 지배적이며, budget 위젯은 기본 OFF라 JSONL 스캔이 없습니다). Linux/macOS 네이티브 bash 5.2는 대체로 더 빠릅니다.
 

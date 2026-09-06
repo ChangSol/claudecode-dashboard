@@ -15,27 +15,28 @@ CFG_FILE="${CC_DASH_CONFIG:-$HOME/.config/cc-dash/widgets.conf}"
 
 WIDGETS=(
   "CLOCK:🕐 시각"
-  "MODEL:🍋 모델"
+  "MODEL:🤖 모델"
+  "EFFORT:🧠 reasoning effort (모델 미지원 시 자동 숨김)"
   "DURATION:⏱ 경과 시간"
-  "API_DUR:🌐 API 소요 시간 (opt-in)"
-  "CTX:🪟 ctx % (+사용/전체)"
-  "TOKEN:💬 token"
+  "API_DUR:📡 API 소요 시간 (opt-in)"
+  "CTX:📊 ctx % (+사용/전체)"
+  "TOKEN:🪙 token"
   "COST:💸 cost (세션 누적, 5분+ 시 ~\$/h)"
   "LINES:✏️ +추가/-삭제 라인"
   "BUDGET:💰 일일 예산 % (opt-in, JSONL 스캔)"
-  "RATE_5H:⏳ now(5h) 리밋 + 타이머 (🔥 페이스 경고)"
-  "RATE_7D:⏳ week(7d) 리밋 + 타이머 (🔥 페이스 경고)"
-  "RATE_MODEL:⏳ 모델별 주간 리밋 (Fable·Opus 등)"
+  "RATE_5H:⚡ now(5h) 리밋 + 타이머 (🔥 페이스 경고)"
+  "RATE_7D:📅 week(7d) 리밋 + 타이머 (🔥 페이스 경고)"
+  "RATE_MODEL:🎯 모델별 주간 리밋 (Fable·Opus 등)"
   "RATE_API:🌐 모델별 리밋 API 조회 (opt-in — OAuth 토큰 사용)"
   "PERM:🔒 권한 모드"
   "STYLE:🎨 output style (opt-in)"
   "VERSION:🚀 Claude Code 버전"
-  "GIT:🔀 git 브랜치"
+  "GIT:🌿 git 브랜치"
   "PROJECT:📁 프로젝트"
   "SESSION:🆔 세션 ID"
 )
 
-DEFAULT_KEYS=(CLOCK MODEL DURATION CTX TOKEN COST LINES RATE_5H RATE_7D RATE_MODEL VERSION GIT)
+DEFAULT_KEYS=(CLOCK MODEL EFFORT DURATION CTX TOKEN COST LINES RATE_5H RATE_7D RATE_MODEL VERSION GIT)
 DEFAULT_OFF=(BUDGET PERM PROJECT SESSION API_DUR STYLE RATE_API)
 
 declare -A STATE
@@ -180,9 +181,9 @@ cc-dash 위젯 ON/OFF
   cc-dash-config.sh refresh            budget 캐시 비우기 + usage 재조회(RATE_API 시)
                                        + statusLine 경로 재배선
 
-KEY (대소문자 무관): CLOCK MODEL DURATION API_DUR CTX TOKEN COST LINES BUDGET
-                    RATE_5H RATE_7D RATE_MODEL RATE_API PERM STYLE VERSION GIT
-                    PROJECT SESSION
+KEY (대소문자 무관): CLOCK MODEL EFFORT DURATION API_DUR CTX TOKEN COST LINES
+                    BUDGET RATE_5H RATE_7D RATE_MODEL RATE_API PERM STYLE VERSION
+                    GIT PROJECT SESSION
 
 RATE_API 는 모델별 주간 리밋(Fable 등)을 Anthropic /api/oauth/usage 에서 받아오는
 opt-in 스위치다 — Claude Code 의 statusLine 페이로드에 그 값이 없어서 필요하다.

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Claude Code statusLine — fork-free bash (ccstatusline-inspired)
-# 원본 7개 위젯(model/duration/ctx/token/cost/5h/7d) + 확장 4개(git/project/ctx-bar/budget)
+# 20개 위젯 — 사용량(L1)/리밋(L2)/메타(L3) 3행. 위젯 토글은 cc-dash-config.sh (기본값은 0절 CFG_*)
 # 트릭: NBSP 공백(trim 방지), \x1b[0m 접두(Claude dim 무효화), JSON은 bash 정규식으로 파싱(jq fork 없음)
 
 # Self-guard: needs bash 4.3+ (printf '%(...)T' is 4.2, `local -n` nameref is 4.3).
@@ -15,7 +15,7 @@ fi
 
 # ---------- 0. 위젯 on/off 설정 로드 (fork-free) ----------
 # cc-dash-config.sh 로 편집. 환경변수 CC_DASH_SHOW_SESSION/BUDGET 은 역호환성 유지.
-CFG_CLOCK=1 CFG_MODEL=1 CFG_DURATION=1 CFG_CTX=1 CFG_TOKEN=1 CFG_COST=1
+CFG_CLOCK=1 CFG_MODEL=1 CFG_EFFORT=1 CFG_DURATION=1 CFG_CTX=1 CFG_TOKEN=1 CFG_COST=1
 CFG_BUDGET=0 CFG_RATE_5H=1 CFG_RATE_7D=1
 CFG_PERM=0 CFG_VERSION=1 CFG_GIT=1 CFG_PROJECT=0 CFG_SESSION=0
 CFG_LINES=1 CFG_API_DUR=0 CFG_STYLE=0 CFG_RATE_MODEL=1 CFG_RATE_API=0
@@ -46,6 +46,9 @@ MODEL="—" MODEL_ID="" CTX_SIZE=0 DURATION_MS=0 CTX_PCT=0 TOKENS=0 COST=""
 RATE_5H=0 RATE_5H_RESET=0 RATE_7D=0 RATE_7D_RESET=0
 CWD="" SESSION_ID="" PERM_MODE="" CC_VERSION=""
 LINES_ADD=0 LINES_DEL=0 API_DUR_MS=0 STYLE_NAME=""
+# EFFORT_LEVEL: effort.level (low/medium/high/xhigh/max) — 없으면 EFFORT 세그먼트 자동 숨김
+# SPEND_*: gateway 환경의 rate_limits.spend_limit — 표시 위젯은 범위 밖, CTX_PCT 오염 방지용 소비
+EFFORT_LEVEL="" SPEND_PCT=0 SPEND_RESET=0
 # 모델별/용도별 주간 윈도 (seven_day_opus·seven_day_sonnet 등 — 제네릭 수집)
 RATE_MD_KEYS=() RATE_MD_PCTS=() RATE_MD_RESETS=()
 
@@ -57,8 +60,10 @@ while IFS= read -r line; do
   val="${val//\"/}"
 
   case "$key" in
+    context_window|rate_limits) in_block=""; block_filled=0;; # top-level 컨테이너 진입 시 상태 리셋 — 필드 하나뿐인 spend 블록이 열린 채 남아도 다음 used_percentage 를 오소비하지 않게
     five_hour)  in_block="5h"; block_filled=0;;
     seven_day)  in_block="7d"; block_filled=0;;
+    spend_limit) in_block="spend"; block_filled=0;; # 값은 SPEND_* 에 소비만 — 아래 used_percentage 의 *) CTX_PCT 분기로 새지 않게
     seven_day_*) # 모델별 주간 윈도 객체(seven_day_opus 등). 불리언(seven_day_overage_included)은 val 이 차 있어 제외
       if [[ -z "$val" ]]; then
         in_block="md"; block_filled=0
@@ -67,10 +72,13 @@ while IFS= read -r line; do
     output_style) # 객체형({"name":...})이면 다음 name 키 대기, 문자열형이면 즉시 값
       if [[ -n "$val" ]]; then STYLE_NAME="$val"; else in_block="style"; fi;;
     name)         [[ "$in_block" == "style" ]] && { STYLE_NAME="$val"; in_block=""; };;
+    effort) # 객체형({"level":...}) — 값이 비어 있을 때만 블록 진입, 다음 level 키 대기
+      [[ -z "$val" ]] && in_block="effort";;
+    level)        [[ "$in_block" == "effort" ]] && { EFFORT_LEVEL="$val"; in_block=""; };;
     display_name) MODEL="$val";;
     id)           MODEL_ID="$val";;
     current_dir)  CWD="$val";;
-    session_id|sessionId)   SESSION_ID="$val";;
+    session_id|sessionId)   [[ -z "$SESSION_ID" ]] && SESSION_ID="$val";; # first-wins — remote.session_id 가 top-level 을 덮지 않도록
     permission_mode|permissionMode) PERM_MODE="$val";;
     version)      CC_VERSION="$val";;
     context_window_size) val="${val// /}"; CTX_SIZE="$val";;
@@ -86,6 +94,7 @@ while IFS= read -r line; do
         5h) RATE_5H_RESET="$val"; block_filled=$((block_filled+1));;
         7d) RATE_7D_RESET="$val"; block_filled=$((block_filled+1));;
         md) RATE_MD_RESETS[${#RATE_MD_KEYS[@]}-1]="$val"; block_filled=$((block_filled+1));;
+        spend) SPEND_RESET="$val"; block_filled=$((block_filled+1));;
       esac
       [ "$block_filled" -ge 2 ] && { in_block=""; block_filled=0; };;
     used_percentage)
@@ -94,6 +103,7 @@ while IFS= read -r line; do
         5h) RATE_5H="$val"; block_filled=$((block_filled+1));;
         7d) RATE_7D="$val"; block_filled=$((block_filled+1));;
         md) RATE_MD_PCTS[${#RATE_MD_KEYS[@]}-1]="$val"; block_filled=$((block_filled+1));;
+        spend) SPEND_PCT="$val"; block_filled=$((block_filled+1));;
         *)  CTX_PCT="$val";;
       esac
       [ "$block_filled" -ge 2 ] && { in_block=""; block_filled=0; };;
@@ -111,6 +121,7 @@ done <<< "$input"
 [[ -z "$LINES_DEL" || "$LINES_DEL" == "null" ]] && LINES_DEL=0
 [[ -z "$API_DUR_MS" || "$API_DUR_MS" == "null" ]] && API_DUR_MS=0
 [[ "$STYLE_NAME" == "null" ]] && STYLE_NAME=""
+[[ "$EFFORT_LEVEL" == "null" ]] && EFFORT_LEVEL=""
 
 # ---------- 4. 포매터 (순수 bash) ----------
 # Duration
@@ -211,13 +222,13 @@ color_for "$CTX_PCT";  CTX_COLOR="$COLOR"
 color_for "$RATE_5H";  RATE_5H_COLOR="$COLOR"
 color_for "$RATE_7D";  RATE_7D_COLOR="$COLOR"
 
-if [ "$RATE_5H" -ge 80 ]; then RATE_5H_ICON="⌛"; else RATE_5H_ICON="⏳"; fi
-if [ "$RATE_7D" -ge 80 ]; then RATE_7D_ICON="⌛"; else RATE_7D_ICON="⏳"; fi
+if [ "$RATE_5H" -ge 80 ]; then RATE_5H_ICON="⌛"; else RATE_5H_ICON="⚡"; fi
+if [ "$RATE_7D" -ge 80 ]; then RATE_7D_ICON="⌛"; else RATE_7D_ICON="📅"; fi
 
 # ========================================================================
 # 확장 위젯 #1 — Git 브랜치 + dirty heuristic
 # ========================================================================
-GIT_DISPLAY="🔀 git —"   # 기본값: 비-git 디렉터리임을 명시
+GIT_DISPLAY="🌿 git —"   # 기본값: 비-git 디렉터리임을 명시
 if [[ -n "$CWD" && -f "$CWD/.git/HEAD" ]]; then
   _branch=""
   while IFS= read -r _head_line; do _branch="$_head_line"; break; done < "$CWD/.git/HEAD"
@@ -231,7 +242,7 @@ if [[ -n "$CWD" && -f "$CWD/.git/HEAD" ]]; then
   if [[ -f "$CWD/.git/MERGE_HEAD" || -f "$CWD/.git/ORIG_HEAD" || -d "$CWD/.git/rebase-merge" ]]; then
     _dirty="*"
   fi
-  [[ -n "$_branch" ]] && GIT_DISPLAY="🔀 git: ${_branch}${_dirty}"
+  [[ -n "$_branch" ]] && GIT_DISPLAY="🌿 git: ${_branch}${_dirty}"
 fi
 
 # ========================================================================
@@ -267,8 +278,8 @@ printf -v CLOCK_DISPLAY '🕐 %(%Y.%m.%d %H:%M)T' -1
 # ========================================================================
 case "$PERM_MODE" in
   plan)              PERM_DISPLAY="📋 perm plan";;
-  auto|autoAccept)   PERM_DISPLAY="🔓 perm auto";;
-  acceptEdits)       PERM_DISPLAY="⚡ perm accept";;
+  auto|autoAccept)   PERM_DISPLAY="🤝 perm auto";;
+  acceptEdits)       PERM_DISPLAY="✅ perm accept";;
   bypassPermissions) PERM_DISPLAY="🏃 perm bypass";;
   default|ask)       PERM_DISPLAY="🔒 perm ask";;
   "")                PERM_DISPLAY="🔒 perm —";;
@@ -359,7 +370,7 @@ fi
 
 # ---------- 6. 출력 조립 ----------
 # 3행으로 분배.
-#   L1 사용량:  model · duration · api(opt) · ctx · token · cost · lines · budget(opt)
+#   L1 사용량:  model · effort(auto-hide) · duration · api(opt) · ctx · token · cost · lines · budget(opt)
 #   L2 리밋:    now(5h) · week(7d) · 모델별 주간(opt, 페이로드 있을 때만)
 #   L3 메타:    perm(opt) · style(opt) · version · git · project · session · clock (맨 오른쪽)
 # 위젯 CFG_* 가 0 이면 세그먼트가 빠지고 구분자(│)도 남지 않는다.
@@ -369,11 +380,13 @@ append() {
   [[ -n "$seg" ]] || return
   [[ -n "$_ref" ]] && _ref+=" │ $seg" || _ref="$seg"
 }
-[[ "$CFG_MODEL"    == "1" ]] && append L1 "🧠 ${MODEL}"
+[[ "$CFG_MODEL"    == "1" ]] && append L1 "🤖 ${MODEL}"
+# effort — 페이로드에 effort.level 이 없으면(모델 미지원) 세그먼트 자체를 생략. 경고 지표가 아니라 색상 없음
+[[ "$CFG_EFFORT"   == "1" && -n "$EFFORT_LEVEL" ]] && append L1 "🧠 effort ${EFFORT_LEVEL}"
 [[ "$CFG_DURATION" == "1" ]] && append L1 "⏱  dur ${TIME}"
-[[ "$CFG_API_DUR"  == "1" ]] && append L1 "🌐 api ${API_TIME}"
-[[ "$CFG_CTX"      == "1" ]] && append L1 "🪟 ctx ${CTX_COLOR}${CTX_PCT}%${RST}${CTX_ABS}"
-[[ "$CFG_TOKEN"    == "1" ]] && append L1 "💬 token ${TOKEN_FMT}"
+[[ "$CFG_API_DUR"  == "1" ]] && append L1 "📡 api ${API_TIME}"
+[[ "$CFG_CTX"      == "1" ]] && append L1 "📊 ctx ${CTX_COLOR}${CTX_PCT}%${RST}${CTX_ABS}"
+[[ "$CFG_TOKEN"    == "1" ]] && append L1 "🪙 token ${TOKEN_FMT}"
 [[ "$CFG_COST"     == "1" ]] && append L1 "💸 cost ${COST_DISPLAY}"
 [[ "$CFG_LINES"    == "1" ]] && append L1 "✏️  ${GRN}+${LINES_ADD}${RST}/${RED}-${LINES_DEL}${RST}"
 [[ -n "$BUDGET_DISPLAY"    ]] && append L1 "${BUDGET_DISPLAY}"
@@ -431,7 +444,7 @@ if [[ "$CFG_RATE_MODEL" == "1" ]]; then
       *)      _ml="${RATE_MD_KEYS[_i]}";;
     esac
     color_for "$_mp"; _mc="$COLOR"
-    if [ "$_mp" -ge 80 ]; then _mi="⌛"; else _mi="⏳"; fi
+    if [ "$_mp" -ge 80 ]; then _mi="⌛"; else _mi="🎯"; fi
     fmt_remain "$_mr"; _mt="$REMAIN_FMT"; [ -n "$_mt" ] && _mt=" reset ${_mt}"
     pace_flag "$_mp" "$_mr" 604800
     append L2 "${_mi} ${_ml} ${_mc}${_mp}%${RST}${REPLY_PACE}${_mt}"
