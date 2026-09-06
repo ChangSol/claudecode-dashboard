@@ -229,9 +229,25 @@ if [ "$RATE_7D" -ge 80 ]; then RATE_7D_ICON="⌛"; else RATE_7D_ICON="📅"; fi
 # 확장 위젯 #1 — Git 브랜치 + dirty heuristic
 # ========================================================================
 GIT_DISPLAY="🌿 git —"   # 기본값: 비-git 디렉터리임을 명시
-if [[ -n "$CWD" && -f "$CWD/.git/HEAD" ]]; then
+# .git 이 디렉터리면 그대로, 파일이면 worktree(git worktree add / claude --worktree) — 첫 줄 "gitdir: <path>" 를
+# 따라간다(상대경로면 CWD 기준, 백슬래시는 / 로 정규화). HEAD·MERGE_HEAD·ORIG_HEAD·rebase-merge 는 모두 그
+# gitdir 아래에 있다. 해석 실패 시 기본값 "git —" 유지. fork 없음.
+_gitdir=""
+if [[ -n "$CWD" ]]; then
+  if [[ -d "$CWD/.git" ]]; then
+    _gitdir="$CWD/.git"
+  elif [[ -f "$CWD/.git" ]]; then
+    while IFS= read -r _gd_line || [[ -n "$_gd_line" ]]; do
+      [[ "$_gd_line" == gitdir:* ]] && _gitdir="${_gd_line#gitdir:}"
+      break
+    done < "$CWD/.git"
+    _gitdir="${_gitdir# }"; _gitdir="${_gitdir%$'\r'}"; _gitdir="${_gitdir//\\//}"
+    [[ -n "$_gitdir" && "$_gitdir" != /* && "$_gitdir" != ?:/* ]] && _gitdir="$CWD/$_gitdir"
+  fi
+fi
+if [[ -n "$_gitdir" && -f "$_gitdir/HEAD" ]]; then
   _branch=""
-  while IFS= read -r _head_line; do _branch="$_head_line"; break; done < "$CWD/.git/HEAD"
+  while IFS= read -r _head_line; do _branch="$_head_line"; break; done < "$_gitdir/HEAD"
   if [[ "$_branch" == ref:* ]]; then
     _branch="${_branch##*/}"
   else
@@ -239,7 +255,7 @@ if [[ -n "$CWD" && -f "$CWD/.git/HEAD" ]]; then
   fi
   _dirty=""
   # fork-free heuristic: MERGE/REBASE/ORIG_HEAD 존재 시 진행 중 작업 표시
-  if [[ -f "$CWD/.git/MERGE_HEAD" || -f "$CWD/.git/ORIG_HEAD" || -d "$CWD/.git/rebase-merge" ]]; then
+  if [[ -f "$_gitdir/MERGE_HEAD" || -f "$_gitdir/ORIG_HEAD" || -d "$_gitdir/rebase-merge" ]]; then
     _dirty="*"
   fi
   [[ -n "$_branch" ]] && GIT_DISPLAY="🌿 git: ${_branch}${_dirty}"
@@ -459,29 +475,43 @@ fi
 [[ "$CFG_SESSION" == "1" ]] && append L3 "$SESSION_DISPLAY"
 [[ "$CFG_CLOCK"   == "1" ]] && append L3 "${CLOCK_DISPLAY}"
 
-# ---------- 6.5 L1 너비 제한 — L2 항상 표시 ----------
-# ANSI 이스케이프(비시각) 건너뛰고, 비-ASCII(이모지 등)는 2컬럼으로 계산.
+# ---------- 6.5 L1·L2 너비 제한 — 한 행이 터미널 폭을 넘어 줄바꿈되지 않게 클립(L3 는 클립 안 함) ----------
+# 로케일 무관(LANG 미설정·MSYS 16비트 wchar 대응), fork 없음.
+# 함수 안에서 LC_ALL=C 로 바이트 모드를 고정하고(종료 시 자동 복원) UTF-8 선두 바이트로 시퀀스 길이와
+# 표시 폭을 판정한다 — 1·2바이트 폭 1, 3·4바이트(이모지·CJK·박스문자) 폭 2, 변이 선택자 U+FE0F·ZWJ U+200D 폭 0.
+# 시퀀스는 통째로 옮겨 중간에서 잘리지 않고(깨진 "�…" 방지), ANSI \033[…m 은 폭 0 으로 통과한다.
+# 결과는 stdout 이 아니라 CLIP_OUT 변수 — 호출부의 $(...) 서브셸 fork 회피.
 _cols="${COLUMNS:-9999}"
-_clip_line() {
-  local s="$1" limit="$2" vcol=0 out="" c esc
+_clip_line() { # $1=line $2=limit(컬럼) → CLIP_OUT
+  local LC_ALL=C
+  local s="$1" limit="$2" vcol=0 out="" c esc seq n w
+  # 바이트 수는 표시 폭의 상한(ASCII 1:1, 2바이트→1, 3·4바이트→2) — limit 이내면 루프 없이 원문 반환
+  if (( ${#s} <= limit )); then CLIP_OUT="$s"; return; fi
   while [[ -n "$s" ]]; do
     c="${s:0:1}"
     if [[ "$c" == $'\033' && "${s:1:1}" == '[' ]]; then
       esc="${s%%m*}m"; out+="$esc"; s="${s:${#esc}}"; continue
     fi
-    if [[ "$c" > $'\x7f' ]]; then
-      (( vcol + 2 > limit )) && { out+="${RST}…"; break; }
-      out+="$c"; s="${s:1}"; (( vcol += 2 ))
-    else
-      (( vcol + 1 > limit )) && { out+="${RST}…"; break; }
-      out+="$c"; s="${s:1}"; (( vcol++ ))
+    printf -v n '%d' "'$c"
+    if   (( n < 128 ));             then n=1; w=1
+    elif (( n >= 192 && n < 224 )); then n=2; w=1
+    elif (( n >= 224 && n < 240 )); then n=3; w=2
+    elif (( n >= 240 && n < 248 )); then n=4; w=2
+    else                                 n=1; w=0   # 고아 연속 바이트/무효 선두 바이트 — 폭 0 으로 통과
     fi
+    seq="${s:0:n}"
+    [[ "$seq" == $'\xef\xb8\x8f' || "$seq" == $'\xe2\x80\x8d' ]] && w=0
+    (( vcol + w > limit )) && { out+="${RST}…"; break; }
+    out+="$seq"; s="${s:n}"; (( vcol += w ))
   done
-  printf '%s' "$out"
+  CLIP_OUT="$out"
 }
-(( ${#L1} + 5 > _cols )) && L1=$(_clip_line "$L1" "$(( _cols - 1 ))")
-# L2도 모델별 윈도(RATE_MODEL)로 비유계가 될 수 있어 동일 클립 적용
-(( ${#L2} + 5 > _cols )) && L2=$(_clip_line "$L2" "$(( _cols - 1 ))")
+# COLUMNS 가 있을 때만 — 바이트 수 기반 사전 판정은 부정확하므로 항상 호출(폭이 limit 이내면 원문 그대로)
+if [[ "$_cols" != "9999" ]]; then
+  _clip_line "$L1" "$(( _cols - 1 ))"; L1="$CLIP_OUT"
+  # L2도 모델별 윈도(RATE_MODEL)로 비유계가 될 수 있어 동일 클립 적용
+  _clip_line "$L2" "$(( _cols - 1 ))"; L2="$CLIP_OUT"
+fi
 
 emit() {
   [[ -n "$1" ]] || return
