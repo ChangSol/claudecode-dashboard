@@ -159,7 +159,7 @@ After saving, `/ccd list` and `/ccd-setup` resolve to the plugin commands. User-
 | `GIT`      | on  | Current branch — `*` means a merge/rebase/cherry-pick/revert is in progress | `🌿 git: main` / `🌿 git: main*`| 3 |
 | `PR`       | **off** | Open PR (MR on GitLab) number + review state for the current branch, as a clickable link (OSC 8) — hidden when there is none | `🔀 PR #1234 pending` | 3 |
 | `PROJECT`  | **off** | Working directory name | `📁 proj: cc-dash`          | 3 |
-| `SESSION`  | **off** | Session name (`/rename` or auto title), falling back to the first 8 characters of the session ID | `🆔 my-session` / `🆔 ab12cd34` | 3 |
+| `SESSION`  | **off** | First 8 characters of the session ID | `🆔 ab12cd34`               | 3 |
 | `CLOCK`    | on  | Current date and time | `🕐 2026.04.21 13:03`           | 3 (rightmost) |
 
 Context %, `now` (5h), `week` (7d), and budget % share the same threshold colors: green → amber (≥50%) → red (≥80%).
@@ -167,7 +167,7 @@ Context %, `now` (5h), `week` (7d), and budget % share the same threshold colors
 Usage extras (no separate toggles — they ride their parent widget):
 - `CTX` appends `(used/total)` when the payload carries `context_window_size`.
 - `COST` appends an hourly burn-rate estimate (`~$X.X/h`) once the session is 5+ minutes old.
-- `RATE_5H` / `RATE_7D` show `—` instead of `0%` when the payload has no `rate_limits` at all (not a subscription plan, or before the session's first response).
+- `RATE_5H` / `RATE_7D` show `—` instead of `0%` when the payload has no `rate_limits` at all (not a subscription plan, or before the session's first response). If `rate_limits` is present but one window is missing (right after a reset, or when the account has no 5-hour window — as of 2026-11 some accounts get only `seven_day`, no `five_hour`), only that segment is hidden.
 - `RATE_5H` / `RATE_7D` append 🔥 when your usage % is ≥15 points ahead of the window's elapsed time — you are on pace to exhaust the limit before it resets.
 - `RATE_MODEL` renders one segment per model-scoped weekly window with the same colors/timer/🔥 treatment as `RATE_7D`, labeled by model (`Fable 26%`). It hides itself when no data is available. **As of Claude Code 2.1.319 the statusLine payload's `rate_limits` carries only `five_hour` and `seven_day`**, so per-model values require the `RATE_API` switch below. If a future payload adds `seven_day_opus`-style fields, those win and no network lookup happens.
 

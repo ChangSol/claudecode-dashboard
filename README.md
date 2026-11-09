@@ -159,7 +159,7 @@ description: alias for /cc-dash:ccd-setup
 | `GIT`      | on  | 현재 브랜치 — `*`는 merge/rebase/cherry-pick/revert 진행 중 | `🌿 git: main` / `🌿 git: main*`| 3 |
 | `PR`       | **off** | 현재 브랜치의 열린 PR(GitLab 은 MR) 번호 + 리뷰 상태, 클릭 가능한 링크(OSC 8) — 없으면 자동 숨김 | `🔀 PR #1234 pending` | 3 |
 | `PROJECT`  | **off** | 작업 디렉터리 이름 | `📁 proj: cc-dash`          | 3 |
-| `SESSION`  | **off** | 세션 이름(`/rename`·자동 제목), 없으면 ID 앞 8자 | `🆔 my-session` / `🆔 ab12cd34` | 3 |
+| `SESSION`  | **off** | 세션 ID 앞 8자 | `🆔 ab12cd34`               | 3 |
 | `CLOCK`    | on  | 현재 날짜·시각 | `🕐 2026.04.21 13:03`           | 3 (맨 오른쪽) |
 
 컨텍스트 %, `now`(5h), `week`(7d), budget %는 동일한 임계 색상을 공유합니다: 녹색 → 주황(≥50%) → 빨강(≥80%).
@@ -167,7 +167,7 @@ description: alias for /cc-dash:ccd-setup
 사용량 부가 표시(별도 토글 없음 — 부모 위젯을 따라갑니다):
 - `CTX`는 페이로드에 `context_window_size`가 오면 `(사용/전체)`를 병기합니다.
 - `COST`는 세션이 5분을 넘으면 시간당 소진율 추정치(`~$X.X/h`)를 병기합니다.
-- `RATE_5H` / `RATE_7D`는 페이로드에 `rate_limits` 자체가 없으면(구독 플랜 아님·세션 첫 응답 전) `0%` 대신 `—`로 표시합니다.
+- `RATE_5H` / `RATE_7D`는 페이로드에 `rate_limits` 자체가 없으면(구독 플랜 아님·세션 첫 응답 전) `0%` 대신 `—`로 표시합니다. `rate_limits`는 있는데 창 하나만 빠져 있으면(리셋 직후, 또는 계정에 5시간 창이 없는 경우 — 2026-11 기준 `five_hour` 없이 `seven_day`만 오는 계정이 있음) 그 세그먼트만 숨깁니다.
 - `RATE_5H` / `RATE_7D`는 사용률이 윈도 경과율보다 15%p 이상 앞서면 🔥를 붙입니다 — 리셋 전에 리밋을 소진할 페이스라는 뜻입니다.
 - `RATE_MODEL`은 모델별 주간 윈도마다 세그먼트 하나를 렌더링합니다 — 색상/타이머/🔥 처리는 `RATE_7D`와 동일하고 모델명으로 라벨링됩니다(`Fable 26%`). 데이터가 없으면 자동 숨김입니다. **현재 Claude Code(2.1.319 확인)의 statusLine 페이로드 `rate_limits`에는 `five_hour`·`seven_day` 둘만 들어오므로**, 모델별 값을 보려면 아래 `RATE_API`를 켜야 합니다. 향후 페이로드에 `seven_day_opus` 류 필드가 추가되면 그 값을 우선 사용합니다(네트워크 조회 없음).
 

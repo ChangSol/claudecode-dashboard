@@ -51,9 +51,9 @@ LINES_ADD=0 LINES_DEL=0 API_DUR_MS=0 STYLE_NAME=""
 # SPEND_*: gateway 환경의 rate_limits.spend_limit — 표시 위젯은 범위 밖, CTX_PCT 오염 방지용 소비
 EFFORT_LEVEL="" SPEND_PCT=0 SPEND_RESET=0 SPEND_SEEN=0 SPEND_USED="" SPEND_LIMIT="" SPEND_PERIOD=""
 # rate_limits 자체가 없으면(구독 아님·첫 응답 전) now/week 를 0% 대신 "—" 로 표시
-RATE_SEEN=0
-# 2.1.251+ 신규 필드 — session_name, fast_mode, pr.*, prompt_cache.*
-SESSION_NAME="" FAST_MODE="" PR_NUM="" PR_STATE="" PR_URL="" PR_KIND=""
+RATE_SEEN=0 RATE_5H_SEEN=0 RATE_7D_SEEN=0
+# 2.1.251+ 신규 필드 — fast_mode, pr.*, prompt_cache.*
+FAST_MODE="" PR_NUM="" PR_STATE="" PR_URL="" PR_KIND=""
 PC_SEEN=0 PC_WARM="" PC_HIT="" PC_EXPIRES=""
 # 모델별/용도별 주간 윈도 (seven_day_opus·seven_day_sonnet 등 — 제네릭 수집)
 RATE_MD_KEYS=() RATE_MD_PCTS=() RATE_MD_RESETS=()
@@ -74,7 +74,6 @@ while IFS= read -r line; do
     warm)         PC_WARM="$val";;
     hit_ratio)    PC_HIT="$val";;
     expires_at)   val="${val%.*}"; PC_EXPIRES="$val";;
-    session_name) SESSION_NAME="$val";;
     fast_mode)    FAST_MODE="$val";;
     number)       PR_NUM="$val";;
     review_state) PR_STATE="$val";;
@@ -83,8 +82,8 @@ while IFS= read -r line; do
     used_usd)     SPEND_USED="$val";;
     limit_usd)    SPEND_LIMIT="$val";;
     period)       SPEND_PERIOD="$val";;
-    five_hour)  in_block="5h"; block_filled=0;;
-    seven_day)  in_block="7d"; block_filled=0;;
+    five_hour)  in_block="5h"; block_filled=0; RATE_5H_SEEN=1;;
+    seven_day)  in_block="7d"; block_filled=0; RATE_7D_SEEN=1;;
     spend_limit) in_block="spend"; block_filled=0; SPEND_SEEN=1;; # 아래 used_percentage 의 *) CTX_PCT 분기로 새지 않게 SPEND_* 로 소비
     seven_day_*) # 모델별 주간 윈도 객체(seven_day_opus 등). 불리언(seven_day_overage_included)은 val 이 차 있어 제외
       if [[ -z "$val" ]]; then
@@ -144,7 +143,6 @@ done <<< "$input"
 [[ -z "$API_DUR_MS" || "$API_DUR_MS" == "null" ]] && API_DUR_MS=0
 [[ "$STYLE_NAME" == "null" ]] && STYLE_NAME=""
 [[ "$EFFORT_LEVEL" == "null" ]] && EFFORT_LEVEL=""
-[[ "$SESSION_NAME" == "null" ]] && SESSION_NAME=""
 [[ "$PR_NUM" =~ ^[0-9]+$ ]] || PR_NUM=""
 [[ "$PR_STATE" == "null" ]] && PR_STATE=""
 [[ "$PC_EXPIRES" =~ ^[0-9]+$ ]] || PC_EXPIRES=0
@@ -308,8 +306,9 @@ fi
 # ========================================================================
 SESSION_DISPLAY=""
 if [[ "$CFG_SESSION" == "1" ]]; then
-  # session_name(/rename·--name 또는 자동 제목)이 있으면 이름 우선, 없으면 ID 앞 8자
-  _sess="${SESSION_NAME:-${SESSION_ID:0:8}}"
+  # ID 앞 8자. session_name 은 /rename 이 없으면 AI 자동 제목(긴 문장)이 들어오고
+  # 페이로드로 둘을 구분할 수 없어 쓰지 않는다
+  _sess="${SESSION_ID:0:8}"
   [[ -n "$_sess" ]] && SESSION_DISPLAY="🆔 ${_sess}" || SESSION_DISPLAY="🆔 —"
 fi
 
@@ -496,12 +495,15 @@ if [[ "$CFG_SPEND" == "1" && "$SPEND_SEEN" == "1" ]]; then
   SPEND_DISPLAY="${_si} spend ${_sc}${SPEND_PCT}%${RST}${_samt}${_st}"
 fi
 
-# rate_limits 블록 자체가 없으면 사용률을 알 수 없음 — 0% 로 오해하지 않게 "—"
-if [[ "$RATE_SEEN" == "1" ]]; then
-  RATE_5H_TXT="${RATE_5H_COLOR}${RATE_5H}%${RST}${PACE_5H}${TIMER_5H}"
-  RATE_7D_TXT="${RATE_7D_COLOR}${RATE_7D}%${RST}${PACE_7D}${TIMER_7D}"
-else
+# rate_limits 블록 자체가 없으면(구독 아님·첫 응답 전) 사용률을 알 수 없음 — 0% 로 오해하지 않게 "—".
+# 블록은 있는데 창 하나만 빠졌으면(리셋 직후 drop, 또는 계정에 그 창이 없음) 그 세그먼트만 숨긴다.
+RATE_5H_TXT="${RATE_5H_COLOR}${RATE_5H}%${RST}${PACE_5H}${TIMER_5H}"
+RATE_7D_TXT="${RATE_7D_COLOR}${RATE_7D}%${RST}${PACE_7D}${TIMER_7D}"
+if [[ "$RATE_SEEN" != "1" ]]; then
   RATE_5H_TXT="—" RATE_7D_TXT="—"
+else
+  [[ "$RATE_5H_SEEN" == "1" ]] || RATE_5H_TXT=""
+  [[ "$RATE_7D_SEEN" == "1" ]] || RATE_7D_TXT=""
 fi
 
 [[ "$FAST_MODE" == "true" ]] && MODEL+=" ↯fast"
@@ -517,8 +519,8 @@ fi
 [[ "$CFG_LINES"    == "1" ]] && append L1 "✏️  ${GRN}+${LINES_ADD}${RST}/${RED}-${LINES_DEL}${RST}"
 [[ -n "$BUDGET_DISPLAY"    ]] && append L1 "${BUDGET_DISPLAY}"
 
-[[ "$CFG_RATE_5H"  == "1" ]] && append L2 "${RATE_5H_ICON} now ${RATE_5H_TXT}"
-[[ "$CFG_RATE_7D"  == "1" ]] && append L2 "${RATE_7D_ICON} week ${RATE_7D_TXT}"
+[[ "$CFG_RATE_5H"  == "1" && -n "$RATE_5H_TXT" ]] && append L2 "${RATE_5H_ICON} now ${RATE_5H_TXT}"
+[[ "$CFG_RATE_7D"  == "1" && -n "$RATE_7D_TXT" ]] && append L2 "${RATE_7D_ICON} week ${RATE_7D_TXT}"
 [[ -n "$SPEND_DISPLAY"     ]] && append L2 "${SPEND_DISPLAY}"
 # 모델별 주간 윈도 — ① 페이로드의 seven_day_* 우선, ② 없으면 RATE_API 캐시(opt-in)
 # 현행 Claude Code 는 statusLine 페이로드에 five_hour·seven_day 만 넣으므로 ①은

@@ -36,7 +36,7 @@ WIDGETS=(
   "GIT:🌿 git 브랜치"
   "PR:🔀 현재 브랜치의 PR/MR 번호 + 리뷰 상태 (opt-in)"
   "PROJECT:📁 프로젝트"
-  "SESSION:🆔 세션 이름(없으면 ID 앞 8자)"
+  "SESSION:🆔 세션 ID"
 )
 
 DEFAULT_KEYS=(CLOCK MODEL EFFORT DURATION CTX TOKEN COST LINES RATE_5H RATE_7D SPEND RATE_MODEL VERSION GIT)
