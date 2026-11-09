@@ -88,8 +88,13 @@ catch (e) { console.error('error: ' + path + ' is not valid JSON — aborting to
 // 1. statusLine
 const bashRef = bashOverride ? "'" + bashOverride + "'" : "bash";
 const cmd = bashRef + " '" + sl + "'";
-const prev = cfg.statusLine && cfg.statusLine.command;
-cfg.statusLine = { type: 'command', command: cmd };
+const prevObj = (cfg.statusLine && typeof cfg.statusLine === 'object') ? cfg.statusLine : {};
+const prev = prevObj.command;
+// padding · refreshInterval · hideVimModeIndicator 등 사용자가 둔 다른 키는 보존한다.
+// refreshInterval 이 없으면 60초를 넣는다 — 이벤트가 없는 유휴 중에도 시계·리셋 타이머·캐시 만료가 갱신되도록.
+const addedRefresh = !('refreshInterval' in prevObj);
+cfg.statusLine = Object.assign({}, prevObj, { type: 'command', command: cmd });
+if (addedRefresh) cfg.statusLine.refreshInterval = 60;
 
 // 2. permissions.allow — Bash rules so /ccd and /ccd-setup skip approval prompts
 cfg.permissions = cfg.permissions || {};
@@ -113,6 +118,7 @@ if (prev === cmd) {
 } else {
   console.log('statusLine added: ' + cmd);
 }
+if (addedRefresh) console.log('statusLine.refreshInterval added: 60 (idle re-render for clock/timers)');
 if (addedRules.length) {
   console.log('permissions.allow added: ' + addedRules.join(', '));
 } else {

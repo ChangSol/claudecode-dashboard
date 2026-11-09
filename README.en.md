@@ -3,7 +3,7 @@
 [한국어](README.md) | **English**
 
 **A fork-free, zero-dependency statusLine for Claude Code.**
-20 widgets — model, effort, duration, API duration, context, tokens, cost, lines changed, budget, rate limits (incl. per-model weekly), permission, output style, version, git, project, session, clock — rendered in three rows. Toggle any widget with `/cc-dash:ccd`.
+23 widgets — model, effort, duration, API duration, context, prompt cache, tokens, cost, lines changed, budget, rate limits (incl. per-model weekly), gateway spend limit, permission, output style, version, git, PR, project, session, clock — rendered in three rows. Toggle any widget with `/cc-dash:ccd`.
 
 ```
 🤖 Opus 4.7 (1M context) │ 🧠 effort high │ ⏱  dur 22m0s │ 📊 ctx 25% │ 🪙 token 50.0K │ 💸 cost $0.50 │ ✏️  +120/-34
@@ -17,18 +17,18 @@
 
 Most statusLine scripts fork `jq`, `awk`, `date`, `git` every second and leave your shell wheezing. cc-dash is **pure bash built-ins on the fast path** (bash ≥ 4.3) — no forks, no `cat`, no `sed`. The only exceptions are two opt-in widgets: budget makes a single `awk` call behind a 60-second cache, and `RATE_API` detaches one background fetch when its 5-minute cache goes cold.
 
-L1 is automatically clipped to terminal width (respects `$COLUMNS`) so L2 and L3 are always visible.
+L1 and L2 are automatically clipped to terminal width (respects `$COLUMNS`) so L3 is always visible.
 
 ---
 
 ## Features
 
-- **20 widgets, all toggle-able** — `/cc-dash:ccd toggle BUDGET`, `/cc-dash:ccd off RATE_7D`, `/cc-dash:ccd reset`.
+- **23 widgets, all toggle-able** — `/cc-dash:ccd toggle BUDGET`, `/cc-dash:ccd off RATE_7D`, `/cc-dash:ccd reset`.
 - **3-row layout** — usage on row 1, rate limits on row 2, meta + clock on row 3.
 - **Self-labeling** — every icon has a short English tag so nothing is cryptic.
 - **Context %, now (5h) / week (7d) rate limits, token count, session cost** — all parsed from the statusLine JSON payload Claude Code provides.
 - **Threshold colors** — ≥50% amber, ≥80% red. The limit icons (⚡/📅/🎯) flip to `⌛` when quota is hot; 🔥 appears when usage runs ahead of the window's reset pace.
-- **Git branch** + in-progress indicator (`*` for merge/rebase).
+- **Git branch** + in-progress indicator (`*` for merge/rebase/cherry-pick/revert).
 - **Optional budget widget** — scans today's JSONL logs to track daily spend against `$CC_DASH_BUDGET`.
 - **PROJECT and SESSION** as separate toggle-able widgets.
 
@@ -53,7 +53,7 @@ The `/cc-dash:ccd` slash command and the `cc-dash-config.sh` / `statusline.sh` s
 /cc-dash:ccd-setup
 ```
 
-Claude Code's plugin manifest has no `statusLine` field, so the first-time wiring is a one-shot helper command that writes the correct `statusLine` entry into `~/.claude/settings.json` for you. Re-run it after every plugin upgrade — the installed path carries the version (`.../cc-dash/1.0.0/...`) and changes on each update. `/cc-dash:ccd refresh` performs the same re-wiring, so either command works.
+Claude Code's plugin manifest has no `statusLine` field, so the first-time wiring is a one-shot helper command that writes the correct `statusLine` entry into `~/.claude/settings.json` for you. It preserves `padding`, `refreshInterval`, and `hideVimModeIndicator` from an existing `statusLine`, and adds `refreshInterval: 60` only when none is set — so the clock, reset timers, and cache expiry keep updating while idle. If you change it to another value, it won't be overwritten. Re-run it after every plugin upgrade — the installed path carries the version (`.../cc-dash/1.0.0/...`) and changes on each update. `/cc-dash:ccd refresh` performs the same re-wiring, so either command works.
 
 > **macOS note:** the system `/bin/bash` is frozen at 3.2 and cannot run cc-dash (which uses `printf '%(…)T'` and `local -n`, requiring bash ≥ 4.3). Install a current bash with `brew install bash` *before* running `/cc-dash:ccd-setup` — on macOS the setup script always wires an **absolute** bash path into `settings.json` (PATH bash if it is ≥ 4.3, otherwise `/opt/homebrew/bin/bash` on Apple Silicon or `/usr/local/bin/bash` on Intel), so the statusLine keeps working even when Claude Code is launched from the GUI with a minimal PATH. If no compatible bash is found, the statusLine renders a one-line warning instead of staying blank. The `/cc-dash:ccd` widget toggle needs the brew bash too — on bash 3.2 it refuses with a clear message instead of failing cryptically.
 
@@ -63,7 +63,8 @@ If you'd rather edit by hand, add this block to `~/.claude/settings.json` with t
 {
   "statusLine": {
     "type": "command",
-    "command": "bash <absolute-path-to>/cc-dash/scripts/statusline.sh"
+    "command": "bash <absolute-path-to>/cc-dash/scripts/statusline.sh",
+    "refreshInterval": 60
   }
 }
 ```
@@ -137,25 +138,28 @@ After saving, `/ccd list` and `/ccd-setup` resolve to the plugin commands. User-
 
 | Key | Default | What it shows | Example | Row |
 |---|---|---|---|---|
-| `MODEL`    | on  | Display name of the active model | `🤖 Opus 4.7 (1M context)`      | 1 |
+| `MODEL`    | on  | Display name of the active model — appends `↯fast` in fast mode | `🤖 Opus 4.7 (1M context)`      | 1 |
 | `EFFORT`   | on  | Current reasoning effort (low·medium·high·xhigh·max) — reflects `/effort` changes immediately, hidden when the model doesn't support it | `🧠 effort xhigh`             | 1 |
 | `DURATION` | on  | Wall-clock time since the session started | `⏱  dur 22m23s`                 | 1 |
 | `API_DUR`  | **off** | Cumulative time spent waiting on API calls | `📡 api 4m32s`              | 1 |
 | `CTX`      | on  | Context usage — appends used/total when the payload carries it | `📊 ctx 25% (50.0K/200.0K)`     | 1 |
+| `CACHE`    | **off** | Prompt-cache hit rate + time left until expiry while warm (`prompt_cache`, 2.1.251+) | `♨️ cache 91% 46m` / `🧊 cache 91% cold` | 1 |
 | `TOKEN`    | on  | Cumulative input tokens for the session | `🪙 token 58.3K`                | 1 |
 | `COST`     | on  | Session cost — appends burn rate past 5 minutes | `💸 cost $1.66 (~$4.5/h)`       | 1 |
 | `LINES`    | on  | Code lines added/removed during the session | `✏️  +120/-34`                  | 1 |
 | `BUDGET`   | **off** | Today's spend against a daily budget — JSONL scan, pay-as-you-go plans | `💰 budget $4.21/$15 (28%)`| 1 |
 | `RATE_5H`  | on  | 5-hour limit usage + reset timer (🔥 pace warning) | `⚡ now 19% reset 3h8m`         | 2 |
 | `RATE_7D`  | on  | Weekly (7-day) limit usage + reset timer (🔥 pace warning) | `📅 week 2% reset 6d22h`        | 2 |
+| `SPEND`    | on  | Claude apps gateway spend limit — usage %, amount, period, reset (hidden when there is no `spend_limit`) | `💳 spend 62% $314/$500/mo reset 18d12h` | 2 |
 | `RATE_MODEL` | on | Per-model weekly limits — hidden when no data is available | `🎯 Fable 26% reset 4d2h`      | 2 |
 | `RATE_API` | **off** | Sources `RATE_MODEL` from an API lookup (opt-in, uses your OAuth token) | — | 2 |
 | `PERM`     | **off** | Current permission mode (ask·plan·accept·auto·bypass) | `🔒 perm ask`               | 3 |
 | `STYLE`    | **off** | Name of the active output style | `🎨 style Explanatory`      | 3 |
 | `VERSION`  | on  | Running Claude Code version | `🚀 cc v2.1.116`                | 3 |
-| `GIT`      | on  | Current branch — `*` means a merge/rebase is in progress | `🌿 git: main` / `🌿 git: main*`| 3 |
+| `GIT`      | on  | Current branch — `*` means a merge/rebase/cherry-pick/revert is in progress | `🌿 git: main` / `🌿 git: main*`| 3 |
+| `PR`       | **off** | Open PR (MR on GitLab) number + review state for the current branch, as a clickable link (OSC 8) — hidden when there is none | `🔀 PR #1234 pending` | 3 |
 | `PROJECT`  | **off** | Working directory name | `📁 proj: cc-dash`          | 3 |
-| `SESSION`  | **off** | First 8 characters of the session ID | `🆔 ab12cd34`               | 3 |
+| `SESSION`  | **off** | Session name (`/rename` or auto title), falling back to the first 8 characters of the session ID | `🆔 my-session` / `🆔 ab12cd34` | 3 |
 | `CLOCK`    | on  | Current date and time | `🕐 2026.04.21 13:03`           | 3 (rightmost) |
 
 Context %, `now` (5h), `week` (7d), and budget % share the same threshold colors: green → amber (≥50%) → red (≥80%).
@@ -163,8 +167,9 @@ Context %, `now` (5h), `week` (7d), and budget % share the same threshold colors
 Usage extras (no separate toggles — they ride their parent widget):
 - `CTX` appends `(used/total)` when the payload carries `context_window_size`.
 - `COST` appends an hourly burn-rate estimate (`~$X.X/h`) once the session is 5+ minutes old.
+- `RATE_5H` / `RATE_7D` show `—` instead of `0%` when the payload has no `rate_limits` at all (not a subscription plan, or before the session's first response).
 - `RATE_5H` / `RATE_7D` append 🔥 when your usage % is ≥15 points ahead of the window's elapsed time — you are on pace to exhaust the limit before it resets.
-- `RATE_MODEL` renders one segment per model-scoped weekly window with the same colors/timer/🔥 treatment as `RATE_7D`, labeled by model (`Fable 26%`). It hides itself when no data is available. **As of Claude Code 2.1.220 the statusLine payload's `rate_limits` carries only `five_hour` and `seven_day`**, so per-model values require the `RATE_API` switch below. If a future payload adds `seven_day_opus`-style fields, those win and no network lookup happens.
+- `RATE_MODEL` renders one segment per model-scoped weekly window with the same colors/timer/🔥 treatment as `RATE_7D`, labeled by model (`Fable 26%`). It hides itself when no data is available. **As of Claude Code 2.1.319 the statusLine payload's `rate_limits` carries only `five_hour` and `seven_day`**, so per-model values require the `RATE_API` switch below. If a future payload adds `seven_day_opus`-style fields, those win and no network lookup happens.
 
 ---
 
@@ -176,19 +181,32 @@ Usage extras (no separate toggles — they ride their parent widget):
 
 > **Note:** The budget widget is designed for pay-per-token plans. If you use a Claude subscription plan, this widget will not reflect actual costs.
 
-Rates are applied **per model**: each JSONL line's `model` field selects the price tier — Opus $5/$25, Fable/Mythos $10/$50, Sonnet $3/$15, Haiku $1/$5 per Mtok (cache write 1.25×, cache read 0.1× of input). Lines without a `model` field fall back to the Opus tier.
+Rates are applied **per model**: each JSONL line's `model` field selects the price tier —
+
+| Model | input / output ($/Mtok) | cache read |
+|---|---|---|
+| Fable·Mythos 5.1 | $10 / $50 | $0.25 |
+| Fable·Mythos 5 | $10 / $50 | $1.00 |
+| Opus 5.5 | $4 / $20 | $0.20 |
+| Opus 5·4.x | $5 / $25 | $0.50 |
+| Sonnet 5·5.5 | $2 / $10 | $0.20 |
+| Sonnet 4.x | $3 / $15 | $0.30 |
+| Haiku 5.5 | $0.10 / $0.50 (prompts up to 100K) | $0.01 |
+| Haiku 4.x | $1 / $5 | $0.10 |
+
+Cache writes are billed at 1.25× for the 5-minute TTL and 2× for the 1-hour TTL (distinguished via `usage.cache_creation.ephemeral_1h_input_tokens` — Claude Code mostly uses the 1-hour TTL). A single response is logged as several lines (one per content block) with the same usage, so lines are deduplicated by message ID and counted once. Lines without a `model` field fall back to Opus 5.5 rates.
 
 | Variable | Default | Meaning |
 |---|---|---|
 | `CC_DASH_BUDGET`       | `15`    | Daily budget in USD |
-| `CC_DASH_RATE_INPUT`   | `5000`  | $/Mtok × 1000, input |
-| `CC_DASH_RATE_OUTPUT`  | `25000` | output |
-| `CC_DASH_RATE_CACHE_W` | `6250`  | cache_creation |
-| `CC_DASH_RATE_CACHE_R` | `500`   | cache_read |
+| `CC_DASH_RATE_INPUT`   | `4000`  | $/Mtok × 1000, input |
+| `CC_DASH_RATE_OUTPUT`  | `20000` | output |
+| `CC_DASH_RATE_CACHE_W` | `5000`  | cache_creation |
+| `CC_DASH_RATE_CACHE_R` | `200`   | cache_read |
 | `CC_DASH_CACHE`        | `~/.cache/cc-dash-budget` | cache file path |
 | `CC_DASH_CONFIG`       | `~/.config/cc-dash/widgets.conf` | widget toggle file |
 
-Setting **any** `CC_DASH_RATE_*` variable switches back to legacy single-rate mode: your rates apply to every line regardless of model (useful for discounted/introductory pricing). Unset variables fall back to the defaults in the table above — set all four for fully custom pricing.
+Setting **any** `CC_DASH_RATE_*` variable switches back to legacy single-rate mode: your rates apply to every line regardless of model and no 1-hour TTL surcharge is added (useful for discounted/introductory pricing). Unset variables fall back to the defaults in the table above — set all four for fully custom pricing.
 
 ### Per-model weekly limits (RATE_API, opt-in)
 
@@ -214,7 +232,7 @@ Turning `RATE_MODEL` off disables the lookup even when `RATE_API` is on (nowhere
 
 ### Terminal width clipping
 
-L1 is clipped to `$COLUMNS` when set, so L2 and L3 are always visible on narrow terminals. To enable auto-detection, add to `~/.bashrc`:
+Claude Code sets `COLUMNS` and `LINES` to the current terminal size before running the statusLine script, so L1 and L2 are clipped to fit with no extra setup and L3 is always visible. On older versions, or when running the script yourself with an empty `$COLUMNS`, add to `~/.bashrc`:
 
 ```bash
 export COLUMNS
@@ -247,12 +265,11 @@ The old opt-in env vars still work and override config-file state:
 
 ## Limitations
 
-- **Git dirty is a heuristic.** The script checks for `MERGE_HEAD` / `ORIG_HEAD` / `rebase-merge` to decide whether to append `*`. A real `git status` would require a fork.
+- **Git dirty is a heuristic.** The script checks for `MERGE_HEAD` / `CHERRY_PICK_HEAD` / `REVERT_HEAD` / `rebase-merge` / `rebase-apply` to decide whether to append `*`. A real `git status` would require a fork.
 - **Budget rates are manual.** JSONL logs don't store a `cost_usd` field directly; cc-dash multiplies token counts by per-model rates. Keep the env vars in sync with Anthropic's pricing.
 - **statusLine is not plugin-declared.** Claude Code's plugin schema currently exposes no `statusLine` field, so users have to add a two-line entry to their own `settings.json` after installing the plugin.
 - **JSONL schema drift.** If Claude Code renames usage fields in the transcript, the `awk` regexes in the budget widget need to be updated.
 - **Per-model limits are absent from the statusLine payload.** `rate_limits` carries only `five_hour` and `seven_day`, so `RATE_MODEL` stays empty without the opt-in `RATE_API` lookup (private `/api/oauth/usage`, needs `curl`). If Anthropic changes that schema, the segment disappears silently.
-- **`spend_limit` is parsed but not shown.** On apps-gateway accounts `rate_limits.spend_limit` is consumed only so its value cannot bleed into the context % — there is no display widget for it yet.
 
 ---
 

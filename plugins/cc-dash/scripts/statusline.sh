@@ -1,6 +1,6 @@
 #!/bin/bash
 # Claude Code statusLine — fork-free bash (ccstatusline-inspired)
-# 20개 위젯 — 사용량(L1)/리밋(L2)/메타(L3) 3행. 위젯 토글은 cc-dash-config.sh (기본값은 0절 CFG_*)
+# 23개 위젯 — 사용량(L1)/리밋(L2)/메타(L3) 3행. 위젯 토글은 cc-dash-config.sh (기본값은 0절 CFG_*)
 # 트릭: NBSP 공백(trim 방지), \x1b[0m 접두(Claude dim 무효화), JSON은 bash 정규식으로 파싱(jq fork 없음)
 
 # Self-guard: needs bash 4.3+ (printf '%(...)T' is 4.2, `local -n` nameref is 4.3).
@@ -19,6 +19,7 @@ CFG_CLOCK=1 CFG_MODEL=1 CFG_EFFORT=1 CFG_DURATION=1 CFG_CTX=1 CFG_TOKEN=1 CFG_CO
 CFG_BUDGET=0 CFG_RATE_5H=1 CFG_RATE_7D=1
 CFG_PERM=0 CFG_VERSION=1 CFG_GIT=1 CFG_PROJECT=0 CFG_SESSION=0
 CFG_LINES=1 CFG_API_DUR=0 CFG_STYLE=0 CFG_RATE_MODEL=1 CFG_RATE_API=0
+CFG_SPEND=1 CFG_CACHE=0 CFG_PR=0
 _CC_DASH_CFG="${CC_DASH_CONFIG:-$HOME/.config/cc-dash/widgets.conf}"
 if [[ -f "$_CC_DASH_CFG" ]]; then
   while IFS='=' read -r _k _v; do
@@ -48,7 +49,12 @@ CWD="" SESSION_ID="" PERM_MODE="" CC_VERSION=""
 LINES_ADD=0 LINES_DEL=0 API_DUR_MS=0 STYLE_NAME=""
 # EFFORT_LEVEL: effort.level (low/medium/high/xhigh/max) — 없으면 EFFORT 세그먼트 자동 숨김
 # SPEND_*: gateway 환경의 rate_limits.spend_limit — 표시 위젯은 범위 밖, CTX_PCT 오염 방지용 소비
-EFFORT_LEVEL="" SPEND_PCT=0 SPEND_RESET=0
+EFFORT_LEVEL="" SPEND_PCT=0 SPEND_RESET=0 SPEND_SEEN=0 SPEND_USED="" SPEND_LIMIT="" SPEND_PERIOD=""
+# rate_limits 자체가 없으면(구독 아님·첫 응답 전) now/week 를 0% 대신 "—" 로 표시
+RATE_SEEN=0
+# 2.1.251+ 신규 필드 — session_name, fast_mode, pr.*, prompt_cache.*
+SESSION_NAME="" FAST_MODE="" PR_NUM="" PR_STATE="" PR_URL="" PR_KIND=""
+PC_SEEN=0 PC_WARM="" PC_HIT="" PC_EXPIRES=""
 # 모델별/용도별 주간 윈도 (seven_day_opus·seven_day_sonnet 등 — 제네릭 수집)
 RATE_MD_KEYS=() RATE_MD_PCTS=() RATE_MD_RESETS=()
 
@@ -58,12 +64,28 @@ while IFS= read -r line; do
   key="${BASH_REMATCH[1]}"
   val="${BASH_REMATCH[2]}"
   val="${val//\"/}"
+  # pretty-print(들여쓰기) JSON 이면 닫는 } 앞 공백이 값 끝에 붙는다 — 꼬리 공백 제거
+  val="${val%"${val##*[![:space:]]}"}"
 
   case "$key" in
-    context_window|rate_limits) in_block=""; block_filled=0;; # top-level 컨테이너 진입 시 상태 리셋 — 필드 하나뿐인 spend 블록이 열린 채 남아도 다음 used_percentage 를 오소비하지 않게
+    context_window) in_block=""; block_filled=0;; # top-level 컨테이너 진입 시 상태 리셋 — 필드 하나뿐인 spend 블록이 열린 채 남아도 다음 used_percentage 를 오소비하지 않게
+    rate_limits) in_block=""; block_filled=0; RATE_SEEN=1;;
+    prompt_cache) in_block=""; block_filled=0; PC_SEEN=1;;
+    warm)         PC_WARM="$val";;
+    hit_ratio)    PC_HIT="$val";;
+    expires_at)   val="${val%.*}"; PC_EXPIRES="$val";;
+    session_name) SESSION_NAME="$val";;
+    fast_mode)    FAST_MODE="$val";;
+    number)       PR_NUM="$val";;
+    review_state) PR_STATE="$val";;
+    url)          PR_URL="$val";;
+    kind)         PR_KIND="$val";;
+    used_usd)     SPEND_USED="$val";;
+    limit_usd)    SPEND_LIMIT="$val";;
+    period)       SPEND_PERIOD="$val";;
     five_hour)  in_block="5h"; block_filled=0;;
     seven_day)  in_block="7d"; block_filled=0;;
-    spend_limit) in_block="spend"; block_filled=0;; # 값은 SPEND_* 에 소비만 — 아래 used_percentage 의 *) CTX_PCT 분기로 새지 않게
+    spend_limit) in_block="spend"; block_filled=0; SPEND_SEEN=1;; # 아래 used_percentage 의 *) CTX_PCT 분기로 새지 않게 SPEND_* 로 소비
     seven_day_*) # 모델별 주간 윈도 객체(seven_day_opus 등). 불리언(seven_day_overage_included)은 val 이 차 있어 제외
       if [[ -z "$val" ]]; then
         in_block="md"; block_filled=0
@@ -122,6 +144,10 @@ done <<< "$input"
 [[ -z "$API_DUR_MS" || "$API_DUR_MS" == "null" ]] && API_DUR_MS=0
 [[ "$STYLE_NAME" == "null" ]] && STYLE_NAME=""
 [[ "$EFFORT_LEVEL" == "null" ]] && EFFORT_LEVEL=""
+[[ "$SESSION_NAME" == "null" ]] && SESSION_NAME=""
+[[ "$PR_NUM" =~ ^[0-9]+$ ]] || PR_NUM=""
+[[ "$PR_STATE" == "null" ]] && PR_STATE=""
+[[ "$PC_EXPIRES" =~ ^[0-9]+$ ]] || PC_EXPIRES=0
 
 # ---------- 4. 포매터 (순수 bash) ----------
 # Duration
@@ -254,8 +280,10 @@ if [[ -n "$_gitdir" && -f "$_gitdir/HEAD" ]]; then
     _branch="${_branch:0:7}"  # detached HEAD → short SHA
   fi
   _dirty=""
-  # fork-free heuristic: MERGE/REBASE/ORIG_HEAD 존재 시 진행 중 작업 표시
-  if [[ -f "$_gitdir/MERGE_HEAD" || -f "$_gitdir/ORIG_HEAD" || -d "$_gitdir/rebase-merge" ]]; then
+  # fork-free heuristic: merge·rebase·cherry-pick·revert 진행 중이면 표시.
+  # ORIG_HEAD 는 pull/reset 후에도 계속 남는 파일이라 판정에서 제외 (상시 "*" 오탐 원인)
+  if [[ -f "$_gitdir/MERGE_HEAD" || -f "$_gitdir/CHERRY_PICK_HEAD" || -f "$_gitdir/REVERT_HEAD" \
+        || -d "$_gitdir/rebase-merge" || -d "$_gitdir/rebase-apply" ]]; then
     _dirty="*"
   fi
   [[ -n "$_branch" ]] && GIT_DISPLAY="🌿 git: ${_branch}${_dirty}"
@@ -280,8 +308,26 @@ fi
 # ========================================================================
 SESSION_DISPLAY=""
 if [[ "$CFG_SESSION" == "1" ]]; then
-  _sess="${SESSION_ID:0:8}"
+  # session_name(/rename·--name 또는 자동 제목)이 있으면 이름 우선, 없으면 ID 앞 8자
+  _sess="${SESSION_NAME:-${SESSION_ID:0:8}}"
   [[ -n "$_sess" ]] && SESSION_DISPLAY="🆔 ${_sess}" || SESSION_DISPLAY="🆔 —"
+fi
+
+# ========================================================================
+# 확장 위젯 #8 — PR / MR (CFG_PR=1, 페이로드 pr.* 가 있을 때만)
+# ========================================================================
+PR_DISPLAY=""
+if [[ "$CFG_PR" == "1" && -n "$PR_NUM" ]]; then
+  case "$PR_STATE" in
+    approved)          _prs=" ${GRN}approved${RST}";;
+    changes_requested) _prs=" ${RED}changes${RST}";;
+    draft|pending)     _prs=" ${PR_STATE}";;
+    *)                 _prs="";;
+  esac
+  [[ "$PR_KIND" == "mr" ]] && _prl="MR !${PR_NUM}" || _prl="PR #${PR_NUM}"
+  # OSC 8 하이퍼링크 — 미지원 터미널은 시퀀스를 무시하고 텍스트만 보인다
+  [[ -n "$PR_URL" ]] && _prl=$'\e]8;;'"${PR_URL}"$'\a'"${_prl}"$'\e]8;;\a'
+  PR_DISPLAY="🔀 ${_prl}${_prs}"
 fi
 
 # ========================================================================
@@ -315,14 +361,18 @@ if [[ -n "$CC_VERSION" ]]; then VERSION_DISPLAY="🚀 cc v${CC_VERSION}"; else V
 BUDGET_DISPLAY=""
 if [[ "$CFG_BUDGET" == "1" ]]; then
   # 단가 (환경변수 오버라이드 가능). 단위: 나노달러/토큰 (× 10^-9 USD)
-  # 기본은 JSONL 각 라인의 model 필드로 모델군별 단가 자동 적용 (opus $5/$25,
-  # fable·mythos $10/$50, sonnet $3/$15, haiku $1/$5 — cache w 1.25x, r 0.1x).
-  # 오버라이드가 하나라도 있으면 구버전과 동일하게 전 모델 공통 단가로 동작.
-  # 아래 기본값은 model 필드가 없는 라인의 폴백(= Opus 티어 $5/$25).
-  RATE_INPUT="${CC_DASH_RATE_INPUT:-5000}"
-  RATE_OUTPUT="${CC_DASH_RATE_OUTPUT:-25000}"
-  RATE_CACHE_W="${CC_DASH_RATE_CACHE_W:-6250}"
-  RATE_CACHE_R="${CC_DASH_RATE_CACHE_R:-500}"
+  # 기본은 JSONL 각 라인의 model 필드로 모델별 단가 자동 적용 ($/MTok, 2026-10 기준):
+  #   fable·mythos 5.1 $10/$50 (cache r $0.25) · fable·mythos 5 $10/$50 (r $1)
+  #   opus 5.5 $4/$20 (r $0.20) · opus 5/4.x $5/$25 (r $0.50)
+  #   sonnet 5.x $2/$10 (r $0.20) · sonnet 4.x $3/$15 (r $0.30)
+  #   haiku 5.5 $0.10/$0.50 (r $0.01, 100K 이하 프롬프트 기준) · haiku 4.x $1/$5 (r $0.10)
+  # cache write 는 5분 TTL 1.25x, 1시간 TTL 2x — usage.cache_creation.ephemeral_1h_input_tokens 로 구분.
+  # 오버라이드가 하나라도 있으면 구버전과 동일하게 전 모델 공통 단가로 동작(1h 가산 없음).
+  # 아래 기본값은 model 필드가 없는 라인의 폴백(= Opus 5.5 단가).
+  RATE_INPUT="${CC_DASH_RATE_INPUT:-4000}"
+  RATE_OUTPUT="${CC_DASH_RATE_OUTPUT:-20000}"
+  RATE_CACHE_W="${CC_DASH_RATE_CACHE_W:-5000}"
+  RATE_CACHE_R="${CC_DASH_RATE_CACHE_R:-200}"
   RATE_FIXED=0
   [[ -n "${CC_DASH_RATE_INPUT}${CC_DASH_RATE_OUTPUT}${CC_DASH_RATE_CACHE_W}${CC_DASH_RATE_CACHE_R}" ]] && RATE_FIXED=1
   BUDGET_LIMIT="${CC_DASH_BUDGET:-15}"
@@ -348,14 +398,22 @@ if [[ "$CFG_BUDGET" == "1" ]]; then
           -v ri="$RATE_INPUT" -v ro="$RATE_OUTPUT" -v rcw="$RATE_CACHE_W" -v rcr="$RATE_CACHE_R" '
         index($0, "\"timestamp\":\"" today) == 0 { next }
         index($0, "\"usage\"") == 0 { next }
+        # 한 API 응답이 콘텐츠 블록마다 한 줄씩(같은 usage 로) 기록된다 — 메시지 ID 로 중복 제거.
+        # 없으면 과다 집계(실측 ~2.8x). resume/fork 로 다른 파일에 복사된 줄도 함께 걸러진다.
+        match($0, /"id":"msg_[^"]*"/) { mid = substr($0, RSTART, RLENGTH); if (mid in seen) next; seen[mid] = 1 }
         {
           ri_ = ri; ro_ = ro; rcw_ = rcw; rcr_ = rcr
           if (!fixed && match($0, /"model":"[^"]*"/)) {
             m = substr($0, RSTART+9, RLENGTH-10)
-            if      (index(m, "opus"))                        { ri_=5000;  ro_=25000; rcw_=6250;  rcr_=500 }
-            else if (index(m, "fable") || index(m, "mythos")) { ri_=10000; ro_=50000; rcw_=12500; rcr_=1000 }
-            else if (index(m, "sonnet"))                      { ri_=3000;  ro_=15000; rcw_=3750;  rcr_=300 }
-            else if (index(m, "haiku"))                       { ri_=1000;  ro_=5000;  rcw_=1250;  rcr_=100 }
+            # 세대 구분 문자열을 먼저 검사 — "sonnet-5" 는 sonnet-5·sonnet-5-5 모두, sonnet-4-5 는 제외
+            if      (index(m, "fable-5-1") || index(m, "mythos-5-1")) { ri_=10000; ro_=50000; rcw_=12500; rcr_=250 }
+            else if (index(m, "fable") || index(m, "mythos"))         { ri_=10000; ro_=50000; rcw_=12500; rcr_=1000 }
+            else if (index(m, "opus-5-5"))                            { ri_=4000;  ro_=20000; rcw_=5000;  rcr_=200 }
+            else if (index(m, "opus"))                                { ri_=5000;  ro_=25000; rcw_=6250;  rcr_=500 }
+            else if (index(m, "sonnet-5"))                            { ri_=2000;  ro_=10000; rcw_=2500;  rcr_=200 }
+            else if (index(m, "sonnet"))                              { ri_=3000;  ro_=15000; rcw_=3750;  rcr_=300 }
+            else if (index(m, "haiku-5-5"))                           { ri_=100;   ro_=500;   rcw_=125;   rcr_=10 }
+            else if (index(m, "haiku"))                               { ri_=1000;  ro_=5000;  rcw_=1250;  rcr_=100 }
           }
           # substr 오프셋 = 키 프리픽스 길이("key": 따옴표+콜론 포함) — 과거 +1 오프셋
           # 오프바이원으로 토큰 수 첫 자리가 잘려 일일 비용이 과소집계되던 결함 교정
@@ -364,6 +422,8 @@ if [[ "$CFG_BUDGET" == "1" ]]; then
           if (match($0, /"output_tokens":[0-9]+/))               s += substr($0, RSTART+16, RLENGTH-16) * ro_
           if (match($0, /"cache_creation_input_tokens":[0-9]+/)) s += substr($0, RSTART+30, RLENGTH-30) * rcw_
           if (match($0, /"cache_read_input_tokens":[0-9]+/))     s += substr($0, RSTART+26, RLENGTH-26) * rcr_
+          # 1h TTL 캐시 쓰기는 input 의 2x — 위에서 5분 단가(1.25x)로 계산한 분량에 차액만 가산
+          if (!fixed && match($0, /"ephemeral_1h_input_tokens":[0-9]+/)) s += substr($0, RSTART+28, RLENGTH-28) * (2 * ri_ - rcw_)
           total += s
         }
         END { printf("%.0f", total / 10000000) }
@@ -386,9 +446,9 @@ fi
 
 # ---------- 6. 출력 조립 ----------
 # 3행으로 분배.
-#   L1 사용량:  model · effort(auto-hide) · duration · api(opt) · ctx · token · cost · lines · budget(opt)
-#   L2 리밋:    now(5h) · week(7d) · 모델별 주간(opt, 페이로드 있을 때만)
-#   L3 메타:    perm(opt) · style(opt) · version · git · project · session · clock (맨 오른쪽)
+#   L1 사용량:  model(+fast) · effort(auto-hide) · duration · api(opt) · ctx · cache(opt) · token · cost · lines · budget(opt)
+#   L2 리밋:    now(5h) · week(7d) · spend(gateway, auto-hide) · 모델별 주간(opt, 페이로드 있을 때만)
+#   L3 메타:    perm(opt) · style(opt) · version · git · pr(opt) · project · session · clock (맨 오른쪽)
 # 위젯 CFG_* 가 0 이면 세그먼트가 빠지고 구분자(│)도 남지 않는다.
 L1="" L2="" L3=""
 append() {
@@ -396,19 +456,70 @@ append() {
   [[ -n "$seg" ]] || return
   [[ -n "$_ref" ]] && _ref+=" │ $seg" || _ref="$seg"
 }
+
+# 프롬프트 캐시 (CFG_CACHE=1, prompt_cache 가 온 뒤에만) — 적중률 + warm 이면 만료까지 남은 시간
+CACHE_DISPLAY=""
+if [[ "$CFG_CACHE" == "1" && "$PC_SEEN" == "1" ]]; then
+  _hit=""
+  # hit_ratio 0~1 → 정수 % (0.91 → 91, 1 → 100, 0.5 → 50). null 이면 "—"
+  if [[ "$PC_HIT" =~ ^([01])(\.([0-9]*))?$ ]]; then
+    _hd="${BASH_REMATCH[3]}00"
+    _hit=$(( ${BASH_REMATCH[1]} * 100 + 10#${_hd:0:2} ))
+    (( _hit > 100 )) && _hit=100
+    _hit+="%"
+  fi
+  if [[ "$PC_WARM" == "true" ]]; then
+    _left=""
+    if [ "$PC_EXPIRES" -gt "${NOW_EPOCH:-0}" ] 2>/dev/null; then
+      _r=$((PC_EXPIRES - NOW_EPOCH))
+      if [ "$_r" -ge 3600 ]; then _left=" $((_r/3600))h$(( (_r%3600)/60 ))m"; else _left=" $((_r/60))m"; fi
+    fi
+    CACHE_DISPLAY="♨️ cache ${_hit:-—}${_left}"
+  else
+    CACHE_DISPLAY="🧊 cache ${_hit:-—} cold"
+  fi
+fi
+
+# gateway 지출 한도 (CFG_SPEND=1, rate_limits.spend_limit 이 있을 때만)
+SPEND_DISPLAY=""
+if [[ "$CFG_SPEND" == "1" && "$SPEND_SEEN" == "1" ]]; then
+  [[ "$SPEND_PCT" =~ ^[0-9]+$ ]] || SPEND_PCT=0
+  color_for "$SPEND_PCT"; _sc="$COLOR"
+  _samt=""
+  if [[ "$SPEND_USED" =~ ^[0-9]+ && "$SPEND_LIMIT" =~ ^[0-9]+ ]]; then
+    _samt=" \$${SPEND_USED%%.*}/\$${SPEND_LIMIT%%.*}"
+  fi
+  case "$SPEND_PERIOD" in daily) _sp="/d";; weekly) _sp="/w";; monthly) _sp="/mo";; *) _sp="";; esac
+  [[ -n "$_samt" ]] && _samt+="$_sp"
+  fmt_remain "$SPEND_RESET"; _st="$REMAIN_FMT"; [ -n "$_st" ] && _st=" reset ${_st}"
+  if [ "$SPEND_PCT" -ge 80 ]; then _si="⌛"; else _si="💳"; fi
+  SPEND_DISPLAY="${_si} spend ${_sc}${SPEND_PCT}%${RST}${_samt}${_st}"
+fi
+
+# rate_limits 블록 자체가 없으면 사용률을 알 수 없음 — 0% 로 오해하지 않게 "—"
+if [[ "$RATE_SEEN" == "1" ]]; then
+  RATE_5H_TXT="${RATE_5H_COLOR}${RATE_5H}%${RST}${PACE_5H}${TIMER_5H}"
+  RATE_7D_TXT="${RATE_7D_COLOR}${RATE_7D}%${RST}${PACE_7D}${TIMER_7D}"
+else
+  RATE_5H_TXT="—" RATE_7D_TXT="—"
+fi
+
+[[ "$FAST_MODE" == "true" ]] && MODEL+=" ↯fast"
 [[ "$CFG_MODEL"    == "1" ]] && append L1 "🤖 ${MODEL}"
 # effort — 페이로드에 effort.level 이 없으면(모델 미지원) 세그먼트 자체를 생략. 경고 지표가 아니라 색상 없음
 [[ "$CFG_EFFORT"   == "1" && -n "$EFFORT_LEVEL" ]] && append L1 "🧠 effort ${EFFORT_LEVEL}"
 [[ "$CFG_DURATION" == "1" ]] && append L1 "⏱  dur ${TIME}"
 [[ "$CFG_API_DUR"  == "1" ]] && append L1 "📡 api ${API_TIME}"
 [[ "$CFG_CTX"      == "1" ]] && append L1 "📊 ctx ${CTX_COLOR}${CTX_PCT}%${RST}${CTX_ABS}"
+[[ -n "$CACHE_DISPLAY"     ]] && append L1 "${CACHE_DISPLAY}"
 [[ "$CFG_TOKEN"    == "1" ]] && append L1 "🪙 token ${TOKEN_FMT}"
 [[ "$CFG_COST"     == "1" ]] && append L1 "💸 cost ${COST_DISPLAY}"
 [[ "$CFG_LINES"    == "1" ]] && append L1 "✏️  ${GRN}+${LINES_ADD}${RST}/${RED}-${LINES_DEL}${RST}"
 [[ -n "$BUDGET_DISPLAY"    ]] && append L1 "${BUDGET_DISPLAY}"
 
-[[ "$CFG_RATE_5H"  == "1" ]] && append L2 "${RATE_5H_ICON} now ${RATE_5H_COLOR}${RATE_5H}%${RST}${PACE_5H}${TIMER_5H}"
-[[ "$CFG_RATE_7D"  == "1" ]] && append L2 "${RATE_7D_ICON} week ${RATE_7D_COLOR}${RATE_7D}%${RST}${PACE_7D}${TIMER_7D}"
+[[ "$CFG_RATE_5H"  == "1" ]] && append L2 "${RATE_5H_ICON} now ${RATE_5H_TXT}"
+[[ "$CFG_RATE_7D"  == "1" ]] && append L2 "${RATE_7D_ICON} week ${RATE_7D_TXT}"
+[[ -n "$SPEND_DISPLAY"     ]] && append L2 "${SPEND_DISPLAY}"
 # 모델별 주간 윈도 — ① 페이로드의 seven_day_* 우선, ② 없으면 RATE_API 캐시(opt-in)
 # 현행 Claude Code 는 statusLine 페이로드에 five_hour·seven_day 만 넣으므로 ①은
 # 사실상 비어 있다. ②는 cc-dash-usage-fetch.sh 가 /api/oauth/usage 에서 받아둔
@@ -471,6 +582,7 @@ fi
 [[ "$CFG_STYLE"   == "1" ]] && append L3 "🎨 style ${STYLE_NAME:-—}"
 [[ "$CFG_VERSION" == "1" ]] && append L3 "$VERSION_DISPLAY"
 [[ "$CFG_GIT"     == "1" ]] && append L3 "$GIT_DISPLAY"
+[[ -n "$PR_DISPLAY"        ]] && append L3 "$PR_DISPLAY"
 [[ "$CFG_PROJECT" == "1" ]] && append L3 "$PROJECT_DISPLAY"
 [[ "$CFG_SESSION" == "1" ]] && append L3 "$SESSION_DISPLAY"
 [[ "$CFG_CLOCK"   == "1" ]] && append L3 "${CLOCK_DISPLAY}"

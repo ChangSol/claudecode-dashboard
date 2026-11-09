@@ -5,7 +5,7 @@ allowed-tools: ["Bash(*cc-dash-setup.sh*)"]
 
 cc-dash statusLine + 허용 permission 을 `~/.claude/settings.json`에 배선합니다.
 
-!`${CLAUDE_PLUGIN_ROOT}/scripts/cc-dash-setup.sh`
+!`bash "${CLAUDE_PLUGIN_ROOT}/scripts/cc-dash-setup.sh"`
 
 위 출력을 짧게 확인해.
 - `statusLine added/updated/already up to date`: "완료 — 다음 턴부터 대시보드 표시".

@@ -3,6 +3,7 @@
   "owner": {
     "name": "ChangSolution"
   },
+  "description": "cc-dash — fork-free bash statusLine dashboard for Claude Code",
   "plugins": [
     {
       "name": "cc-dash",

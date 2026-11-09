@@ -20,24 +20,27 @@ WIDGETS=(
   "DURATION:⏱ 경과 시간"
   "API_DUR:📡 API 소요 시간 (opt-in)"
   "CTX:📊 ctx % (+사용/전체)"
+  "CACHE:♨️ 프롬프트 캐시 적중률 + 만료까지 남은 시간 (opt-in)"
   "TOKEN:🪙 token"
   "COST:💸 cost (세션 누적, 5분+ 시 ~\$/h)"
   "LINES:✏️ +추가/-삭제 라인"
   "BUDGET:💰 일일 예산 % (opt-in, JSONL 스캔)"
   "RATE_5H:⚡ now(5h) 리밋 + 타이머 (🔥 페이스 경고)"
   "RATE_7D:📅 week(7d) 리밋 + 타이머 (🔥 페이스 경고)"
+  "SPEND:💳 gateway 지출 한도 (spend_limit 없으면 자동 숨김)"
   "RATE_MODEL:🎯 모델별 주간 리밋 (Fable·Opus 등)"
   "RATE_API:🌐 모델별 리밋 API 조회 (opt-in — OAuth 토큰 사용)"
   "PERM:🔒 권한 모드"
   "STYLE:🎨 output style (opt-in)"
   "VERSION:🚀 Claude Code 버전"
   "GIT:🌿 git 브랜치"
+  "PR:🔀 현재 브랜치의 PR/MR 번호 + 리뷰 상태 (opt-in)"
   "PROJECT:📁 프로젝트"
-  "SESSION:🆔 세션 ID"
+  "SESSION:🆔 세션 이름(없으면 ID 앞 8자)"
 )
 
-DEFAULT_KEYS=(CLOCK MODEL EFFORT DURATION CTX TOKEN COST LINES RATE_5H RATE_7D RATE_MODEL VERSION GIT)
-DEFAULT_OFF=(BUDGET PERM PROJECT SESSION API_DUR STYLE RATE_API)
+DEFAULT_KEYS=(CLOCK MODEL EFFORT DURATION CTX TOKEN COST LINES RATE_5H RATE_7D SPEND RATE_MODEL VERSION GIT)
+DEFAULT_OFF=(BUDGET PERM PROJECT SESSION API_DUR STYLE RATE_API CACHE PR)
 
 declare -A STATE
 reset_defaults() {
@@ -181,9 +184,9 @@ cc-dash 위젯 ON/OFF
   cc-dash-config.sh refresh            budget 캐시 비우기 + usage 재조회(RATE_API 시)
                                        + statusLine 경로 재배선
 
-KEY (대소문자 무관): CLOCK MODEL EFFORT DURATION API_DUR CTX TOKEN COST LINES
-                    BUDGET RATE_5H RATE_7D RATE_MODEL RATE_API PERM STYLE VERSION
-                    GIT PROJECT SESSION
+KEY (대소문자 무관): CLOCK MODEL EFFORT DURATION API_DUR CTX CACHE TOKEN COST
+                    LINES BUDGET RATE_5H RATE_7D SPEND RATE_MODEL RATE_API PERM
+                    STYLE VERSION GIT PR PROJECT SESSION
 
 RATE_API 는 모델별 주간 리밋(Fable 등)을 Anthropic /api/oauth/usage 에서 받아오는
 opt-in 스위치다 — Claude Code 의 statusLine 페이로드에 그 값이 없어서 필요하다.
