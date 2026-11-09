@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# cc-dash — 모델별 주간 리밋 fetcher (RATE_API 위젯 전용, opt-in)
+# cc-dash — 모델별 주간 리밋 fetcher (RATE_MODEL 위젯 전용, opt-in)
 #
 # statusLine 은 네트워크를 타지 않는다 — 이 스크립트가 캐시 파일을 갱신하고
 # statusline.sh 는 캐시만 읽는다. statusline.sh 가 TTL 초과 시 백그라운드로

@@ -28,8 +28,7 @@ WIDGETS=(
   "RATE_5H:⚡ now(5h) 리밋 + 타이머 (🔥 페이스 경고)"
   "RATE_7D:📅 week(7d) 리밋 + 타이머 (🔥 페이스 경고)"
   "SPEND:💳 gateway 지출 한도 (spend_limit 없으면 자동 숨김)"
-  "RATE_MODEL:🎯 모델별 주간 리밋 (Fable·Opus 등)"
-  "RATE_API:🌐 모델별 리밋 API 조회 (opt-in — OAuth 토큰 사용)"
+  "RATE_MODEL:🎯 모델별 주간 리밋 (Fable·Opus 등, opt-in — OAuth 토큰으로 API 조회)"
   "PERM:🔒 권한 모드"
   "STYLE:🎨 output style (opt-in)"
   "VERSION:🚀 Claude Code 버전"
@@ -39,8 +38,8 @@ WIDGETS=(
   "SESSION:🆔 세션 ID"
 )
 
-DEFAULT_KEYS=(CLOCK MODEL EFFORT DURATION CTX TOKEN COST LINES RATE_5H RATE_7D SPEND RATE_MODEL VERSION GIT)
-DEFAULT_OFF=(BUDGET PERM PROJECT SESSION API_DUR STYLE RATE_API CACHE PR)
+DEFAULT_KEYS=(CLOCK MODEL EFFORT DURATION CTX TOKEN COST LINES RATE_5H RATE_7D SPEND VERSION GIT)
+DEFAULT_OFF=(BUDGET PERM PROJECT SESSION API_DUR STYLE RATE_MODEL CACHE PR)
 
 declare -A STATE
 reset_defaults() {
@@ -50,24 +49,36 @@ reset_defaults() {
 reset_defaults
 
 if [[ -f "$CFG_FILE" ]]; then
+  _merged=0 _api=0 _model=""
   while IFS='=' read -r _k _v; do
     [[ "$_k" =~ ^[A-Z_0-9]+$ ]] || continue
     [[ "$_v" == "0" || "$_v" == "1" ]] || continue
-    STATE["$_k"]="$_v"
+    case "$_k" in
+      MERGED_RATE) _merged="$_v";;
+      RATE_API)    _api="$_v";;
+      RATE_MODEL)  _model="$_v";;
+      *)           STATE["$_k"]="$_v";;
+    esac
   done < "$CFG_FILE"
+  # v1.5.0 에서 RATE_API(조회)를 RATE_MODEL(표시)에 합쳤다. MERGED_RATE 표식이 없는 구형 파일은
+  # 예전에 실제로 값이 보이던 조합(RATE_API=1 이고 RATE_MODEL 이 0 이 아님)만 ON 으로 옮긴다 —
+  # 동의 없이 토큰 조회가 시작되지 않게. statusline.sh 0절과 같은 규칙.
+  if [[ "$_merged" == "1" ]]; then
+    STATE[RATE_MODEL]="${_model:-0}"
+  elif [[ "$_api" == "1" && "$_model" != "0" ]]; then
+    STATE[RATE_MODEL]=1
+  else
+    STATE[RATE_MODEL]=0
+  fi
 fi
+
+# 구 키 별칭 — RATE_API 는 RATE_MODEL 로 합쳐졌다 (결과는 REPLY_KEY, 서브셸 없이)
+canon_key() { if [[ "$1" == "RATE_API" ]]; then REPLY_KEY="RATE_MODEL"; else REPLY_KEY="$1"; fi; }
 
 valid_key() {
   local k="$1" e
   for e in "${WIDGETS[@]}"; do [[ "${e%%:*}" == "$k" ]] && return 0; done
   return 1
-}
-
-# RATE_API(조회)만 켜고 RATE_MODEL(표시)이 꺼진 죽은 조합 — 조회 결과가 렌더될 곳이 없다
-warn_rate_combo() {
-  if [[ "${STATE[RATE_API]}" == "1" && "${STATE[RATE_MODEL]}" != "1" ]]; then
-    printf 'warning: RATE_API 는 ON 인데 RATE_MODEL 이 off — 조회해도 위젯이 표시되지 않는다. 켜려면: cc-dash-config.sh on RATE_MODEL\n' >&2
-  fi
 }
 
 print_status() {
@@ -86,7 +97,6 @@ print_status() {
     fi
     printf '  %-12s %s  %s\n' "$key" "$mark" "$label"
   done
-  warn_rate_combo
 }
 
 save_file() {
@@ -97,6 +107,7 @@ save_file() {
       key="${entry%%:*}"
       printf '%s=%s\n' "$key" "${STATE[$key]:-0}"
     done
+    printf 'MERGED_RATE=1\n'   # RATE_API 통합(v1.5.0) 이후 형식 표식 — 지우지 말 것
   } > "$CFG_FILE"
 }
 
@@ -108,7 +119,7 @@ if [[ $# -gt 0 ]]; then
     on|off|toggle)
       [[ $# -lt 1 ]] && { printf '사용법: %s KEY [KEY ...]\n' "$cmd" >&2; exit 2; }
       for k in "$@"; do
-        K="${k^^}"
+        canon_key "${k^^}"; K="$REPLY_KEY"
         valid_key "$K" || { printf '알 수 없는 위젯: %s\n' "$k" >&2; exit 1; }
         case "$cmd" in
           on)  STATE["$K"]=1;;
@@ -137,15 +148,11 @@ if [[ $# -gt 0 ]]; then
       else
         printf 'budget 캐시 없음 — 다음 렌더에서 새로 계산: %s\n' "$cache_file"
       fi
-      # ①-b RATE_API 가 켜져 있으면 모델별 리밋을 지금 동기로 다시 받아둔다.
+      # ①-b RATE_MODEL 이 켜져 있으면 모델별 리밋을 지금 동기로 다시 받아둔다.
       # (꺼져 있으면 네트워크·토큰 접근 없음 — 캐시/마커만 정리한다.)
       usage_cache="${CC_DASH_USAGE_CACHE:-$HOME/.cache/cc-dash-usage}"
       [[ -f "${usage_cache}.attempt" ]] && rm "${usage_cache}.attempt" 2>/dev/null
-      if [[ "${STATE[RATE_API]}" == "1" && "${STATE[RATE_MODEL]}" != "1" ]]; then
-        # 죽은 조합 — README 문서화 동작(표시 없으면 조회 없음)과 정합: 조회를 생략한다
-        printf 'usage 조회 생략 — RATE_MODEL 이 off 라 위젯이 표시되지 않는다. 켜려면: cc-dash-config.sh on RATE_MODEL\n'
-        warn_rate_combo
-      elif [[ "${STATE[RATE_API]}" == "1" ]]; then
+      if [[ "${STATE[RATE_MODEL]}" == "1" ]]; then
         fetch_sh="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/cc-dash-usage-fetch.sh"
         if [[ -f "$fetch_sh" ]]; then
           if bash "$fetch_sh" -v; then
@@ -158,7 +165,7 @@ if [[ $# -gt 0 ]]; then
         fi
       else
         [[ -f "$usage_cache" ]] && rm "$usage_cache" 2>/dev/null
-        printf 'usage 조회 off (RATE_API) — 켜려면: cc-dash-config.sh on RATE_API\n'
+        printf 'usage 조회 off (RATE_MODEL) — 켜려면: cc-dash-config.sh on RATE_MODEL\n'
       fi
       # ② statusLine 재배선 — 플러그인 업그레이드 시 settings.json 이 구버전
       # 경로를 가리킨 채로 남는다. setup 은 멱등이라 최신이면 그대로 통과한다.
@@ -181,15 +188,15 @@ cc-dash 위젯 ON/OFF
   cc-dash-config.sh off KEY [KEY …]    끄기
   cc-dash-config.sh reset              기본값 복원
   cc-dash-config.sh all-on | all-off   전체 ON/OFF
-  cc-dash-config.sh refresh            budget 캐시 비우기 + usage 재조회(RATE_API 시)
+  cc-dash-config.sh refresh            budget 캐시 비우기 + usage 재조회(RATE_MODEL 시)
                                        + statusLine 경로 재배선
 
 KEY (대소문자 무관): CLOCK MODEL EFFORT DURATION API_DUR CTX CACHE TOKEN COST
-                    LINES BUDGET RATE_5H RATE_7D SPEND RATE_MODEL RATE_API PERM
-                    STYLE VERSION GIT PR PROJECT SESSION
+                    LINES BUDGET RATE_5H RATE_7D SPEND RATE_MODEL PERM STYLE
+                    VERSION GIT PR PROJECT SESSION   (RATE_API 는 RATE_MODEL 의 별칭)
 
-RATE_API 는 모델별 주간 리밋(Fable 등)을 Anthropic /api/oauth/usage 에서 받아오는
-opt-in 스위치다 — Claude Code 의 statusLine 페이로드에 그 값이 없어서 필요하다.
+RATE_MODEL 은 모델별 주간 리밋(Fable 등)을 표시하는 opt-in 위젯이다. Claude Code 의
+statusLine 페이로드에 그 값이 없어서 Anthropic /api/oauth/usage 에서 받아온다 —
 켜면 백그라운드에서 OAuth 액세스 토큰(~/.claude/.credentials.json)을 읽어 5분 TTL
 캐시를 갱신한다. 끄면 네트워크·토큰 접근이 전혀 없다.
 EOF

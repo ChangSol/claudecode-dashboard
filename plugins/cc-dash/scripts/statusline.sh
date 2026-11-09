@@ -18,7 +18,7 @@ fi
 CFG_CLOCK=1 CFG_MODEL=1 CFG_EFFORT=1 CFG_DURATION=1 CFG_CTX=1 CFG_TOKEN=1 CFG_COST=1
 CFG_BUDGET=0 CFG_RATE_5H=1 CFG_RATE_7D=1
 CFG_PERM=0 CFG_VERSION=1 CFG_GIT=1 CFG_PROJECT=0 CFG_SESSION=0
-CFG_LINES=1 CFG_API_DUR=0 CFG_STYLE=0 CFG_RATE_MODEL=1 CFG_RATE_API=0
+CFG_LINES=1 CFG_API_DUR=0 CFG_STYLE=0 CFG_RATE_MODEL="" CFG_RATE_API=0 CFG_MERGED_RATE=0
 CFG_SPEND=1 CFG_CACHE=0 CFG_PR=0
 _CC_DASH_CFG="${CC_DASH_CONFIG:-$HOME/.config/cc-dash/widgets.conf}"
 if [[ -f "$_CC_DASH_CFG" ]]; then
@@ -27,6 +27,16 @@ if [[ -f "$_CC_DASH_CFG" ]]; then
     [[ "$_v" == "0" || "$_v" == "1" ]] || continue
     printf -v "CFG_$_k" '%s' "$_v"
   done < "$_CC_DASH_CFG"
+fi
+# RATE_MODEL 은 v1.5.0 에서 RATE_API(조회 스위치)를 흡수했다 — 켜면 OAuth 토큰으로 API 를 조회한다.
+# MERGED_RATE 표식이 없는 구형 파일은 RATE_API=1 이고 RATE_MODEL 이 0 이 아닐 때만 ON
+# (동의 없이 토큰 조회가 시작되지 않게). cc-dash-config.sh 의 로드 규칙과 같다.
+if [[ "$CFG_MERGED_RATE" == "1" ]]; then
+  CFG_RATE_MODEL="${CFG_RATE_MODEL:-0}"
+elif [[ "$CFG_RATE_API" == "1" && "$CFG_RATE_MODEL" != "0" ]]; then
+  CFG_RATE_MODEL=1
+else
+  CFG_RATE_MODEL=0
 fi
 [[ "$CC_DASH_SHOW_SESSION" == "1" ]] && CFG_PROJECT=1 && CFG_SESSION=1
 [[ "$CC_DASH_SHOW_BUDGET"  == "1" ]] && CFG_BUDGET=1
@@ -522,11 +532,11 @@ fi
 [[ "$CFG_RATE_5H"  == "1" && -n "$RATE_5H_TXT" ]] && append L2 "${RATE_5H_ICON} now ${RATE_5H_TXT}"
 [[ "$CFG_RATE_7D"  == "1" && -n "$RATE_7D_TXT" ]] && append L2 "${RATE_7D_ICON} week ${RATE_7D_TXT}"
 [[ -n "$SPEND_DISPLAY"     ]] && append L2 "${SPEND_DISPLAY}"
-# 모델별 주간 윈도 — ① 페이로드의 seven_day_* 우선, ② 없으면 RATE_API 캐시(opt-in)
-# 현행 Claude Code 는 statusLine 페이로드에 five_hour·seven_day 만 넣으므로 ①은
+# 모델별 주간 윈도 (RATE_MODEL, opt-in) — ① 페이로드의 seven_day_* 우선, ② 없으면 API 캐시.
+# 현행 Claude Code(2.1.319)는 statusLine 페이로드에 모델별 창을 넣지 않으므로 ①은
 # 사실상 비어 있다. ②는 cc-dash-usage-fetch.sh 가 /api/oauth/usage 에서 받아둔
-# 캐시를 읽는다 — OAuth 토큰을 쓰는 경로라 RATE_API 를 켠 사용자에게만 동작한다.
-if [[ "$CFG_RATE_MODEL" == "1" && "$CFG_RATE_API" == "1" && ${#RATE_MD_KEYS[@]} -eq 0 ]]; then
+# 캐시를 읽는다 — OAuth 토큰을 쓰는 경로라 RATE_MODEL 을 켠 사용자에게만 동작한다.
+if [[ "$CFG_RATE_MODEL" == "1" && ${#RATE_MD_KEYS[@]} -eq 0 ]]; then
   _uc="${CC_DASH_USAGE_CACHE:-$HOME/.cache/cc-dash-usage}"
   _uc_fetched=""
   if [[ -f "$_uc" ]]; then
